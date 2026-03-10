@@ -9,6 +9,10 @@ import { toolLogger } from '../lib/logger.js';
 import { getTool as getControlTool, getAvailableTools as getControlTools } from './control.js';
 import type { TaskType } from '../ipc/scheduled.js';
 
+// Import skills system for skill execution tool
+import { getSkillExecutor } from '../skills/skill-executor.js';
+import { executeSkill as executeSkillDB, getEnabledSkills } from '../ipc/skills.js';
+
 // Type definitions for database query results
 interface SettingsRow {
   value: string;
@@ -2233,6 +2237,247 @@ tools.stock_quote = {
       return {
         result: null,
         error: `Failed to fetch stock data: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * Execute Skill Tool - Execute a skill by name or ID
+ * Bridges Quick Chat's tool system to the skills execution system
+ */
+tools.execute_skill = {
+  name: 'execute_skill',
+  description:
+    'Execute a skill by name. Skills are specialized capabilities that can perform specific tasks like document processing, media conversion, or custom workflows. Use this to leverage built-in skills for tasks beyond standard tools.',
+  parameters: {
+    skill_name: {
+      type: 'string',
+      description:
+        'Name of the skill to execute. Examples: "pdf-convert", "image-resize", "document-summarizer". Use list_skills to see available skills.',
+      required: false,
+    },
+    skill_id: {
+      type: 'string',
+      description: 'Alternative to skill_name - ID of the skill to execute.',
+      required: false,
+    },
+    input: {
+      type: 'object',
+      description:
+        'Input parameters for the skill as an object. Example: {"file": "document.pdf", "format": "jpg"} or {"query": "search terms"}.',
+      required: false,
+    },
+    timeout: {
+      type: 'number',
+      description: 'Execution timeout in milliseconds. Default: 30000 (30 seconds).',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    try {
+      const db = getDatabase();
+
+      // Get skill identifier
+      const skillName = params.skill_name as string | undefined;
+      const skillId = params.skill_id as string | undefined;
+      const input = (params.input as Record<string, unknown>) || {};
+      const timeout = (params.timeout as number) || 30000;
+
+      if (!skillName && !skillId) {
+        return {
+          result: null,
+          error: 'Missing required parameter: skill_name or skill_id is required.',
+        };
+      }
+
+      // Find skill by name or ID
+      let targetSkill;
+      if (skillId) {
+        // Get by ID directly from skills in database
+        const skills = getEnabledSkills(db);
+        targetSkill = skills.find((s: any) => s.id === skillId);
+      } else if (skillName) {
+        // Search by name (case-insensitive partial match)
+        const skills = getEnabledSkills(db);
+        targetSkill = skills.find((s: any) =>
+          s.name.toLowerCase().includes(skillName.toLowerCase())
+        );
+
+        // If not found, try exact match
+        if (!targetSkill) {
+          targetSkill = skills.find((s: any) => s.name.toLowerCase() === skillName.toLowerCase());
+        }
+      }
+
+      if (!targetSkill) {
+        const identifier = skillName || skillId;
+        return {
+          result: null,
+          error: `Skill not found: "${identifier}". Available skills can be listed with the list_skills tool.`,
+        };
+      }
+
+      toolLogger.info(`[execute_skill] Executing skill: ${targetSkill.name}`);
+
+      // Check if skill has scripts to execute (multi-file skill with folder)
+      if (targetSkill.skill_dir && targetSkill.scripts && targetSkill.scripts.length > 0) {
+        // Use skill executor for multi-file skills
+        const executor = getSkillExecutor();
+
+        // Verify dependencies if any
+        if (targetSkill.dependencies && targetSkill.dependencies.length > 0) {
+          toolLogger.info(
+            `[execute_skill] Checking ${targetSkill.dependencies.length} dependencies for ${targetSkill.name}`
+          );
+          const missingDeps = [];
+          for (const dep of targetSkill.dependencies) {
+            const installed = await executor.verifyDependency(dep);
+            if (!installed) {
+              missingDeps.push(`${dep.type}:${dep.name}`);
+            }
+          }
+
+          if (missingDeps.length > 0) {
+            toolLogger.warn(`[execute_skill] Missing dependencies: ${missingDeps.join(', ')}`);
+            return {
+              result: null,
+              error: `Skill "${targetSkill.name}" requires dependencies that are not installed: ${missingDeps.join(', ')}. Please install them first.`,
+              missingDependencies: missingDeps,
+            };
+          }
+        }
+
+        // Execute the skill
+        const result = await executor.executeSkill({
+          skillName: targetSkill.name,
+          skillDir: targetSkill.skill_dir,
+          input,
+          timeout,
+        });
+
+        if (result.success) {
+          toolLogger.info(`[execute_skill] Skill executed successfully: ${targetSkill.name}`);
+          return {
+            result: {
+              skill: targetSkill.name,
+              output: result.output,
+              stdout: result.stdout,
+              executionTime: result.executionTime,
+              success: true,
+              message: `Skill "${targetSkill.name}" executed successfully`,
+            },
+          };
+        } else {
+          toolLogger.error(`[execute_skill] Skill execution failed: ${result.error}`);
+          return {
+            result: null,
+            error: `Skill execution failed: ${result.error}`,
+            stderr: result.stderr,
+            exitCode: result.exitCode,
+            executionTime: result.executionTime,
+          };
+        }
+      }
+
+      // Fall back to inline code execution
+      if (!targetSkill.code) {
+        return {
+          result: null,
+          error: `Skill "${targetSkill.name}" has no executable code or scripts.`,
+        };
+      }
+
+      // Use database executeSkill function for inline code
+      const result = await executeSkillDB(db, targetSkill.id, {
+        input,
+        timeout,
+      });
+
+      if (result.success) {
+        toolLogger.info(`[execute_skill] Inline skill executed successfully: ${targetSkill.name}`);
+        return {
+          result: {
+            skill: targetSkill.name,
+            output: result.output,
+            logs: result.logs,
+            executionTime: result.executionTime,
+            success: true,
+            message: `Skill "${targetSkill.name}" executed successfully`,
+          },
+        };
+      } else {
+        toolLogger.error(`[execute_skill] Inline skill execution failed: ${result.error}`);
+        return {
+          result: null,
+          error: `Skill execution failed: ${result.error}`,
+          executionTime: result.executionTime,
+        };
+      }
+    } catch (error: any) {
+      toolLogger.error('[execute_skill] Error:', error);
+      return {
+        result: null,
+        error: `Failed to execute skill: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * List Skills Tool - List all available enabled skills
+ */
+tools.list_skills = {
+  name: 'list_skills',
+  description:
+    'List all available enabled skills. Returns skill names, descriptions, capabilities, and whether they have executable scripts. Use this to discover what skills are available before executing them.',
+  parameters: {
+    domain: {
+      type: 'string',
+      description:
+        'Optional domain filter to show only skills in a specific domain. Examples: "document", "media", "automation", "analysis".',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    try {
+      const db = getDatabase();
+      const domain = params.domain as string | undefined;
+
+      let skills = getEnabledSkills(db);
+
+      // Filter by domain if specified
+      if (domain) {
+        skills = skills.filter(
+          (s: any) => s.metadata?.domain?.toLowerCase() === domain.toLowerCase()
+        );
+      }
+
+      const skillList = skills.map((s: any) => ({
+        id: s.id,
+        name: s.name,
+        description: s.description,
+        domain: s.metadata?.domain,
+        hasScripts: !!(s.scripts && s.scripts.length > 0),
+        scriptCount: s.scripts?.length || 0,
+        hasDependencies: !!(s.dependencies && s.dependencies.length > 0),
+        dependencyCount: s.dependencies?.length || 0,
+        isBuiltin: s.is_builtin,
+      }));
+
+      return {
+        result: {
+          skills: skillList,
+          total: skillList.length,
+          domain: domain || 'all',
+          message: `Found ${skillList.length} available skill${skillList.length !== 1 ? 's' : ''}`,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error('[list_skills] Error:', error);
+      return {
+        result: null,
+        error: `Failed to list skills: ${error.message}`,
       };
     }
   },
