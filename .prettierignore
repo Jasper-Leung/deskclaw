@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist-electron/
+next/.next/
+next/out/
+release/
+
+# Logs
+*.log
+logs/
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeskClaw Browser Controller</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 8px 0;
+      color: #1a1a1a;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+    .status.connected {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .status.disconnected {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .status.connected .status-dot {
+      background: #16a34a;
+    }
+    .status.disconnected .status-dot {
+      background: #dc2626;
+    }
+    .info {
+      font-size: 12px;
+      color: #666;
+      line-height: 1.5;
+    }
+    .button {
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      background: #2563eb;
+      color: white;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .button:hover {
+      background: #1d4ed8;
+    }
+    .button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>DeskClaw Controller</h1>
+
+  <div id="status" class="status disconnected">
+    <div class="status-dot"></div>
+    <span id="statusText">Disconnected</span>
+  </div>
+
+  <p class="info">
+    This extension allows DeskClaw to control your browser without remote debugging.
+  </p>
+
+  <p class="info">
+    <strong>Status:</strong> <span id="connectionStatus">Not connected to DeskClaw</span>
+  </p>
+
+  <p class="info" style="font-size: 11px;">
+    Make sure DeskClaw is running and the Extension Bridge service is started.
+  </p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

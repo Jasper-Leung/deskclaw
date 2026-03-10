@@ -1,0 +1,78 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-electron/
+next/.next/
+next/out/
+build/
+release/
+
+# Electron
+*.log
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.cache/
+.temp/
+tmp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Husky
+.husky/_
+
+# Sensitive files
+*.env
+*.key
+*.pem
+
+# Temporary files
+*.log
+*.tmp
+
+# Integration and test reports
+INTEGRATION_REPORT.md
+VERIFICATION_REPORT.md
+MEMORY_INTEGRATION_SUMMARY.md
+test-integration.js
+wait-for-next.*
+nul

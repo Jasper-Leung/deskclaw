@@ -1,0 +1,59 @@
+{
+  // Editor
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
+  // Files
+  "files.eol": "\n",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+
+  // TypeScript
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.importModuleSpecifier": "relative",
+
+  // ESLint
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+  "eslint.options": {
+    "extensions": [".js", ".jsx", ".ts", ".tsx"]
+  },
+
+  // Prettier
+  "prettier.requireConfig": true,
+
+  // Excludes
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/dist-electron": true,
+    "**/.next": true,
+    "**/release": true
+  },
+
+  // Search
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/dist-electron": true,
+    "**/.next": true,
+    "**/release": true,
+    "**/.git": true
+  },
+
+  // Watcher
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/node_modules/**": true,
+    "**/dist-electron/**": true,
+    "**/.next/**": true
+  }
+}

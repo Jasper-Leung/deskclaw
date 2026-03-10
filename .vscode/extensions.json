@@ -1,0 +1,31 @@
+{
+  "recommendations": [
+    // Essential
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+
+    // TypeScript
+    "usernamehw.errorlens",
+    "streetsidesoftware.code-spell-checker",
+
+    // React
+    "dsznajder.es7-react-js-snippets",
+    "Formulahendry.auto-rename-tag",
+
+    // Git
+    "eamodio.gitlens",
+    "github.copilot",
+
+    // Testing
+    "vitest.explorer",
+
+    // Electron
+    "geequlim.electron-debug",
+
+    // Other
+    "christian-kohler.path-intellisense",
+    "usernamehw.bulkreplace",
+    "wakatime.vscode-wakatime"
+  ]
+}
