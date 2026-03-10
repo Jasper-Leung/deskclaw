@@ -418,7 +418,7 @@ Please help me generate project documentation:
 Documentation Type: {docType|API documentation}
 Code/Module: {code|src/api/user.js}
 Documentation Style: {style|JSDoc}
-Output File: {output|docs/api.md}
+Output File Path: {output|docs/api.md}
 
 Please generate documentation containing:
 1. Overview and introduction
@@ -428,7 +428,7 @@ Please generate documentation containing:
 5. Usage examples
 6. Important notes
 
-Please save to specified file after generation.`,
+IMPORTANT: Save the generated documentation to the specified output file path using file_write tool.`,
         },
       },
       {
@@ -437,22 +437,31 @@ Please save to specified file after generation.`,
         position: { x: 100, y: 280 },
         data: {
           label: 'Documentation Generation Expert',
+          modelId: 'default',
           systemPrompt:
-            'You are a technical writing expert specializing in creating clear, complete technical documentation. Please generate:\n1. Well-structured documentation\n2. Accurate technical descriptions\n3. Practical code examples\n4. Necessary notes and warnings\n\nDocumentation should be easy to understand and maintain. Use file_write tool to save after generation.',
+            'You are a technical writing expert specializing in creating clear, complete technical documentation. ' +
+            'Your task is to:\n' +
+            '1. Generate well-structured documentation based on the user requirements\n' +
+            '2. Include accurate technical descriptions and practical code examples\n' +
+            '3. Add necessary notes and warnings\n' +
+            '4. IMPORTANT: You MUST save the generated documentation to a file using the file_write tool\n' +
+            '\n' +
+            'The user will specify an output file path (e.g., "docs/api.md"). Use that exact path for the filepath parameter.\n' +
+            'Use the file_write tool with these parameters:\n' +
+            '- filepath: the output file path specified by the user\n' +
+            '- content: the generated documentation content\n' +
+            '\n' +
+            'Example tool call:\n' +
+            '{"tool": "file_write", "parameters": {"filepath": "docs/api.md", "content": "# API Documentation\\n\\n..."}}',
           temperature: 0.4,
+          enabledTools: ['file_write'],
+          maxIterations: 5,
         },
-      },
-      {
-        id: 'tool-save-doc',
-        type: 'tool',
-        position: { x: 100, y: 410 },
-        data: { label: 'Save Documentation File', toolName: 'file_write' },
       },
     ],
     edges: [
       { id: 'e18', source: 'trigger-docs', target: 'prompt-doc-req' },
       { id: 'e19', source: 'prompt-doc-req', target: 'agent-documenter' },
-      { id: 'e20', source: 'agent-documenter', target: 'tool-save-doc' },
     ],
   },
 
