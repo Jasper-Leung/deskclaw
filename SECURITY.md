@@ -11,7 +11,7 @@
 If you discover a security vulnerability in this project, please follow these steps:
 
 1. **Do not create a public GitHub issue** - this would expose the vulnerability to the public
-2. **Email us directly** at security@example.com with the details of the vulnerability
+2. **Use GitHub Private Vulnerability Reporting** - click the "Report a vulnerability" button at the top of this page to submit a report privately
 3. **Include as much information as possible**:
    - Steps to reproduce the vulnerability
    - Affected versions
@@ -50,7 +50,7 @@ We follow responsible disclosure principles and will:
 
 ## Security Audits
 
-If you're interested in conducting a security audit of DeskClaw, please contact us at security@example.com.
+If you're interested in conducting a security audit of DeskClaw, please open a report through GitHub's Private Vulnerability Reporting.
 
 ## License
 

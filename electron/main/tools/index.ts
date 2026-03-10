@@ -680,6 +680,143 @@ tools.http_request = {
 };
 
 /**
+ * Web Scrape Tool
+ * Fetches a webpage and extracts its text content for AI analysis
+ */
+tools.web_scrape = {
+  name: 'web_scrape',
+  description:
+    'Fetch a webpage and extract its text content for AI analysis. Returns the main readable text from the page, stripped of HTML, scripts, and styles.',
+  parameters: {
+    url: {
+      type: 'string',
+      description: 'The URL to scrape. Example: "https://example.com/article" or "example.com"',
+      required: true,
+    },
+    timeout: {
+      type: 'number',
+      description: 'Request timeout in milliseconds. Default: 10000',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const url = params.url as string;
+    const timeout = (params.timeout as number) || 10000;
+
+    try {
+      // Add protocol if missing
+      let targetUrl = url;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        targetUrl = `https://${url}`;
+      }
+
+      toolLogger.info(`[web_scrape] Fetching URL: ${targetUrl}, timeout: ${timeout}ms`);
+
+      // Fetch the webpage with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const html = await response.text();
+
+      // Extract text content using regex-based approach
+      // Remove script and style tags first
+      let text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+      text = text.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+      text = text.replace(/<head\b[^<]*(?:(?!<\/head>)<[^<]*)*<\/head>/gi, '');
+      text = text.replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, '');
+      text = text.replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, '');
+      text = text.replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, '');
+      text = text.replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, '');
+
+      // Remove all HTML tags
+      text = text.replace(/<[^>]+>/g, ' ');
+
+      // Decode HTML entities
+      const textArea = { value: '' };
+      text = text.replace(/&nbsp;/g, ' ');
+      text = text.replace(/&amp;/g, '&');
+      text = text.replace(/&lt;/g, '<');
+      text = text.replace(/&gt;/g, '>');
+      text = text.replace(/&quot;/g, '"');
+      text = text.replace(/&#39;/g, "'");
+      text = text.replace(/&apos;/g, "'");
+
+      // Normalize whitespace
+      text = text.replace(/\s+/g, ' ');
+      text = text.replace(/\n\s*\n/g, '\n\n');
+
+      // Trim and limit length
+      text = text.trim();
+      const maxLength = 50000; // 50k characters max
+      let truncated = false;
+      if (text.length > maxLength) {
+        text = text.substring(0, maxLength);
+        truncated = true;
+      }
+
+      // Extract title from HTML if available
+      const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : '';
+
+      // Extract meta description
+      const descMatch = html.match(
+        /<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["'][^>]*>/i
+      );
+      const description = descMatch ? descMatch[1].trim() : '';
+
+      toolLogger.info(
+        `[web_scrape] Successfully scraped ${targetUrl}: ${text.length} characters, ${html.length} bytes HTML`
+      );
+
+      return {
+        result: {
+          url: targetUrl,
+          title,
+          description,
+          content: text,
+          length: text.length,
+          truncated,
+          htmlSize: html.length,
+          message: truncated
+            ? `Content truncated to ${maxLength} characters. Full content was ${text.length} characters.`
+            : `Successfully extracted ${text.length} characters from webpage.`,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[web_scrape] Failed to scrape ${url}:`, error);
+
+      let errorMessage = `Failed to scrape webpage: ${error.message}`;
+      if (error.name === 'AbortError') {
+        errorMessage = `Request timeout after ${timeout}ms. The webpage took too long to respond.`;
+      } else if (error.message.includes('ECONNREFUSED') || error.message.includes('ENOTFOUND')) {
+        errorMessage = `Cannot connect to webpage. Please check the URL and your internet connection.`;
+      }
+
+      return {
+        result: null,
+        error: errorMessage,
+      };
+    }
+  },
+};
+
+/**
  * Get Current Time Tool
  */
 tools.get_time = {

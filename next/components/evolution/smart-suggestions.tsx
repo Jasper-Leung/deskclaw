@@ -183,33 +183,33 @@ function SuggestionCard({ suggestion, onDismiss, onApply }: SuggestionCardProps)
 
   return (
     <div className="rounded-lg border bg-card p-4 hover:border-primary/50 transition-colors">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1">
-          <div className="mt-0.5">{getSuggestionIcon()}</div>
-          <div className="flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              <h4 className="font-medium text-sm">{suggestion.title}</h4>
-              <Badge variant="outline" className="text-xs">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex-shrink-0">{getSuggestionIcon()}</div>
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-medium text-sm break-words">{suggestion.title}</h4>
+              <Badge variant="outline" className="text-xs flex-shrink-0">
                 {getSuggestionTypeLabel()}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{suggestion.description}</p>
+            <p className="text-sm text-muted-foreground break-words">{suggestion.description}</p>
 
             {/* Confidence indicator */}
             <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-muted-foreground">Confidence:</span>
+              <span className="text-xs text-muted-foreground flex-shrink-0">Confidence:</span>
               <Progress
                 value={suggestion.confidence * 100}
-                className="h-1.5 flex-1 max-w-[100px]"
+                className="h-1.5 flex-1 min-w-0 max-w-[100px]"
               />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground flex-shrink-0">
                 {Math.round(suggestion.confidence * 100)}%
               </span>
             </div>
 
             {/* Estimated impact */}
             {suggestion.estimatedImpact && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1 break-words">
                 💡 {suggestion.estimatedImpact}
               </p>
             )}
@@ -230,8 +230,8 @@ function SuggestionCard({ suggestion, onDismiss, onApply }: SuggestionCardProps)
                   <ul className="mt-2 space-y-1">
                     {suggestion.suggestedActions.map((action, i) => (
                       <li key={i} className="text-xs text-muted-foreground flex items-start gap-2">
-                        <span className="text-primary">•</span>
-                        <span>{action.description}</span>
+                        <span className="text-primary flex-shrink-0">•</span>
+                        <span className="break-words">{action.description}</span>
                       </li>
                     ))}
                   </ul>
@@ -242,14 +242,19 @@ function SuggestionCard({ suggestion, onDismiss, onApply }: SuggestionCardProps)
         </div>
 
         {/* Action buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
           {suggestion.actionable && (
-            <Button size="sm" variant="default" className="h-8" onClick={onApply}>
+            <Button size="sm" variant="default" className="h-8 flex-shrink-0" onClick={onApply}>
               <Check className="h-4 w-4 mr-1" />
               Apply
             </Button>
           )}
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={onDismiss}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 p-0 flex-shrink-0"
+            onClick={onDismiss}
+          >
             <X className="h-4 w-4" />
           </Button>
         </div>

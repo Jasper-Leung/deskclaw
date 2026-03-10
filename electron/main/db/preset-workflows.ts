@@ -25,43 +25,43 @@ export interface PresetWorkflow {
 }
 
 /**
- * 通用开发工作流 - 按照项目开发顺序设计
+ * General Development Workflows - Designed in project development order
  */
 export const presetWorkflows: PresetWorkflow[] = [
   // ============================================
-  // 阶段 1: 项目规划工作流
+  // Phase 1: Project Planning Workflow
   // ============================================
   {
     name: 'Project Planner',
-    description: '项目规划 - 需求分析、技术选型、任务拆解',
+    description: 'Project Planning - Requirements analysis, technology selection, task breakdown',
     nodes: [
       {
         id: 'trigger-planning',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始规划', triggerType: 'manual' },
+        data: { label: 'Start Planning', triggerType: 'manual' },
       },
       {
         id: 'prompt-project-idea',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '项目构思',
-          prompt: `项目规划助手
+          label: 'Project Idea',
+          prompt: `Project Planning Assistant
 
-请帮我规划一个新项目：
+Please help me plan a new project:
 
-项目描述: {description|一个简单的待办事项应用}
-目标用户: {users|个人用户}
-核心功能: {features|添加任务、完成任务、设置提醒}
-技术偏好: {tech|不限制，请推荐}
+Project Description: {description|A simple todo application}
+Target Users: {users|Individual users}
+Core Features: {features|Add tasks, complete tasks, set reminders}
+Technology Preference: {tech|No restrictions, please recommend}
 
-请提供：
-1. 项目概述和目标
-2. 推荐的技术栈
-3. 核心功能列表
-4. 开发阶段规划
-5. 潜在的技术挑战`,
+Please provide:
+1. Project overview and goals
+2. Recommended technology stack
+3. Core feature list
+4. Development phase planning
+5. Potential technical challenges`,
         },
       },
       {
@@ -69,9 +69,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '项目规划师',
+          label: 'Project Planner',
           systemPrompt:
-            '你是一位经验丰富的产品经理和技术架构师。你擅长:\n- 分析需求并制定产品愿景\n- 选择合适的技术栈\n- 拆解开发任务和里程碑\n- 识别潜在风险和挑战\n\n请提供结构化、可执行的项目规划。',
+            'You are an experienced product manager and technical architect. You excel at:\n- Analyzing requirements and defining product vision\n- Selecting appropriate technology stacks\n- Breaking down development tasks and milestones\n- Identifying potential risks and challenges\n\nPlease provide structured, actionable project planning.',
           temperature: 0.5,
         },
       },
@@ -83,38 +83,38 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 2: 项目初始化工作流
+  // Phase 2: Project Initialization Workflow
   // ============================================
   {
     name: 'Project Setup',
-    description: '项目初始化 - 创建项目结构、配置文件、README',
+    description: 'Project Initialization - Create project structure, configuration files, README',
     nodes: [
       {
         id: 'trigger-setup',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始初始化', triggerType: 'manual' },
+        data: { label: 'Start Initialization', triggerType: 'manual' },
       },
       {
         id: 'prompt-setup-params',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '项目配置',
-          prompt: `项目初始化助手
+          label: 'Project Configuration',
+          prompt: `Project Initialization Assistant
 
-请帮我初始化一个新项目：
+Please help me initialize a new project:
 
-项目名称: {name|my-project}
-项目类型: {type|web应用}
-技术栈: {stack|React + Node.js}
-需要配置: {configs|package.json, README, .gitignore}
+Project Name: {name|my-project}
+Project Type: {type|Web application}
+Technology Stack: {stack|React + Node.js}
+Required Configurations: {configs|package.json, README, .gitignore}
 
-请生成以下文件并保存：
-1. package.json - 项目配置和依赖
-2. README.md - 项目说明文档
-3. .gitignore - Git忽略配置
-4. 项目基础目录结构说明`,
+Please generate and save the following files:
+1. package.json - Project configuration and dependencies
+2. README.md - Project documentation
+3. .gitignore - Git ignore configuration
+4. Basic project directory structure description`,
         },
       },
       {
@@ -122,9 +122,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '项目初始化专家',
+          label: 'Project Initialization Expert',
           systemPrompt:
-            '你是一位DevOps专家，擅长项目初始化和配置。你的任务:\n1. 根据项目类型生成合理的配置文件\n2. 使用 file_write 工具保存每个配置文件\n3. 创建清晰的项目结构说明\n4. 包含常用的依赖和脚本\n\n每个文件都要单独保存，请使用 file_write 工具。',
+            'You are a DevOps expert specializing in project initialization and configuration. Your tasks:\n1. Generate appropriate configuration files based on project type\n2. Use file_write tool to save each configuration file\n3. Create clear project structure documentation\n4. Include common dependencies and scripts\n\nEach file must be saved separately using the file_write tool.',
           temperature: 0.3,
         },
       },
@@ -132,19 +132,19 @@ export const presetWorkflows: PresetWorkflow[] = [
         id: 'tool-write-package',
         type: 'tool',
         position: { x: 100, y: 410 },
-        data: { label: '保存 package.json', toolName: 'file_write' },
+        data: { label: 'Save package.json', toolName: 'file_write' },
       },
       {
         id: 'tool-write-readme',
         type: 'tool',
         position: { x: 250, y: 410 },
-        data: { label: '保存 README.md', toolName: 'file_write' },
+        data: { label: 'Save README.md', toolName: 'file_write' },
       },
       {
         id: 'tool-write-gitignore',
         type: 'tool',
         position: { x: 400, y: 410 },
-        data: { label: '保存 .gitignore', toolName: 'file_write' },
+        data: { label: 'Save .gitignore', toolName: 'file_write' },
       },
     ],
     edges: [
@@ -157,40 +157,40 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 3: 代码开发工作流
+  // Phase 3: Code Development Workflow
   // ============================================
   {
     name: 'Code Builder',
-    description: '代码生成 - 根据需求生成功能代码',
+    description: 'Code Generation - Generate functional code based on requirements',
     nodes: [
       {
         id: 'trigger-coding',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始编码', triggerType: 'manual' },
+        data: { label: 'Start Coding', triggerType: 'manual' },
       },
       {
         id: 'prompt-code-req',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '功能需求',
-          prompt: `代码生成助手
+          label: 'Feature Requirements',
+          prompt: `Code Generation Assistant
 
-请帮我实现一个功能：
+Please help me implement a feature:
 
-功能描述: {description|用户登录功能}
-文件路径: {filepath|src/auth/login.js}
-编程语言: {language|javascript}
-具体需求: {requirements|邮箱密码登录，记住密码，错误处理}
+Feature Description: {description|User login functionality}
+File Path: {filepath|src/auth/login.js}
+Programming Language: {language|javascript}
+Specific Requirements: {requirements|Email/password login, remember password, error handling}
 
-请生成：
-1. 完整可用的代码
-2. 详细的代码注释
-3. 错误处理
-4. 使用说明
+Please generate:
+1. Complete, usable code
+2. Detailed code comments
+3. Error handling
+4. Usage instructions
 
-生成后请保存到指定文件`,
+Please save to the specified file after generation`,
         },
       },
       {
@@ -198,9 +198,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '代码生成器',
+          label: 'Code Generator',
           systemPrompt:
-            '你是一位资深的软件工程师，擅长编写清晰、可维护的代码。你的任务:\n1. 根据需求生成完整、可用的代码\n2. 添加详细的注释说明\n3. 实现完善的错误处理\n4. 遵循最佳实践和设计模式\n5. 生成代码后使用 file_write 工具保存到文件\n\n重要：一定要使用 file_write 工具将代码保存到指定文件！',
+            'You are a senior software engineer specializing in writing clear, maintainable code. Your tasks:\n1. Generate complete, usable code based on requirements\n2. Add detailed comments\n3. Implement comprehensive error handling\n4. Follow best practices and design patterns\n5. Use file_write tool to save code to file after generation\n\nImportant: You must use the file_write tool to save code to the specified file!',
           temperature: 0.4,
         },
       },
@@ -208,7 +208,7 @@ export const presetWorkflows: PresetWorkflow[] = [
         id: 'tool-save-code',
         type: 'tool',
         position: { x: 100, y: 410 },
-        data: { label: '保存代码文件', toolName: 'file_write' },
+        data: { label: 'Save Code File', toolName: 'file_write' },
       },
     ],
     edges: [
@@ -219,40 +219,40 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 4: 代码审查工作流
+  // Phase 4: Code Review Workflow
   // ============================================
   {
     name: 'Code Review',
-    description: '代码审查 - 检查代码质量、发现bug、优化建议',
+    description: 'Code Review - Check code quality, find bugs, optimization suggestions',
     nodes: [
       {
         id: 'trigger-review',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始审查', triggerType: 'manual' },
+        data: { label: 'Start Review', triggerType: 'manual' },
       },
       {
         id: 'prompt-code-to-review',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '待审查代码',
-          prompt: `代码审查助手
+          label: 'Code to Review',
+          prompt: `Code Review Assistant
 
-请帮我审查以下代码：
+Please help me review the following code:
 
-代码文件: {filepath|src/app.js}
-代码内容:
+Code File: {filepath|src/app.js}
+Code Content:
 {code}
 
-审查重点:
-1. 代码质量和规范性
-2. 潜在的bug和错误
-3. 性能优化建议
-4. 安全性问题
-5. 可维护性改进
+Review Focus:
+1. Code quality and standards
+2. Potential bugs and errors
+3. Performance optimization suggestions
+4. Security issues
+5. Maintainability improvements
 
-请提供详细的审查报告和改进建议。`,
+Please provide detailed review report and improvement suggestions.`,
         },
       },
       {
@@ -260,9 +260,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '代码审查专家',
+          label: 'Code Review Expert',
           systemPrompt:
-            '你是一位资深的代码审查专家，擅长发现代码中的问题。请提供:\n1. 清晰的问题分类\n2. 具体的改进建议\n3. 示例代码（如果需要）\n4. 优先级标记（高/中/低）\n\n审查时关注：功能正确性、代码质量、性能、安全、可维护性。',
+            'You are a senior code review expert specializing in identifying issues in code. Please provide:\n1. Clear issue classification\n2. Specific improvement suggestions\n3. Example code (if needed)\n4. Priority markers (High/Medium/Low)\n\nFocus on: functional correctness, code quality, performance, security, maintainability.',
           temperature: 0.3,
         },
       },
@@ -274,42 +274,42 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 5: 测试开发工作流
+  // Phase 5: Test Development Workflow
   // ============================================
   {
     name: 'Test Generator',
-    description: '测试开发 - 生成单元测试、集成测试',
+    description: 'Test Development - Generate unit tests, integration tests',
     nodes: [
       {
         id: 'trigger-test',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始测试', triggerType: 'manual' },
+        data: { label: 'Start Testing', triggerType: 'manual' },
       },
       {
         id: 'prompt-test-req',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '测试需求',
-          prompt: `测试生成助手
+          label: 'Test Requirements',
+          prompt: `Test Generation Assistant
 
-请为以下代码生成测试：
+Please generate tests for the following code:
 
-代码文件: {filepath|src/utils.js}
-代码内容:
+Code File: {filepath|src/utils.js}
+Code Content:
 {code}
 
-测试类型: {testType|单元测试}
-测试框架: {framework|Jest}
+Test Type: {testType|Unit test}
+Test Framework: {framework|Jest}
 
-请生成：
-1. 完整的测试用例
-2. 边界条件测试
-3. 异常情况测试
-4. Mock配置（如果需要）
+Please generate:
+1. Complete test cases
+2. Boundary condition tests
+3. Exception handling tests
+4. Mock configuration (if needed)
 
-生成后请保存到测试文件。`,
+Please save to test file after generation.`,
         },
       },
       {
@@ -317,9 +317,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '测试开发专家',
+          label: 'Test Development Expert',
           systemPrompt:
-            '你是一位测试开发专家，擅长编写全面的测试用例。请生成:\n1. 正常场景测试\n2. 边界值测试\n3. 异常处理测试\n4. Mock和Stub配置\n\n测试应该简洁明了，易于理解和维护。生成后使用 file_write 工具保存测试文件。',
+            'You are a test development expert specializing in writing comprehensive test cases. Please generate:\n1. Normal scenario tests\n2. Boundary value tests\n3. Exception handling tests\n4. Mock and Stub configuration\n\nTests should be concise, clear, easy to understand and maintain. Use file_write tool to save test files after generation.',
           temperature: 0.3,
         },
       },
@@ -327,7 +327,7 @@ export const presetWorkflows: PresetWorkflow[] = [
         id: 'tool-save-test',
         type: 'tool',
         position: { x: 100, y: 410 },
-        data: { label: '保存测试文件', toolName: 'file_write' },
+        data: { label: 'Save Test File', toolName: 'file_write' },
       },
     ],
     edges: [
@@ -338,40 +338,40 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 6: Bug修复工作流
+  // Phase 6: Bug Fix Workflow
   // ============================================
   {
     name: 'Bug Fixer',
-    description: 'Bug修复 - 分析错误、提供解决方案',
+    description: 'Bug Fix - Analyze errors, provide solutions',
     nodes: [
       {
         id: 'trigger-debug',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始调试', triggerType: 'manual' },
+        data: { label: 'Start Debugging', triggerType: 'manual' },
       },
       {
         id: 'prompt-error-info',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '错误信息',
-          prompt: `Bug修复助手
+          label: 'Error Information',
+          prompt: `Bug Fix Assistant
 
-我遇到了一个错误，请帮我分析和修复：
+I encountered an error, please help me analyze and fix it:
 
-错误信息: {error|ReferenceError: foo is not defined}
-代码片段:
+Error Message: {error|ReferenceError: foo is not defined}
+Code Snippet:
 {code}
 
-上下文:
-{context|在用户登录功能中}
+Context:
+{context|In user login functionality}
 
-请提供：
-1. 错误原因分析
-2. 修复方案
-3. 修复后的代码
-4. 预防类似错误的建议`,
+Please provide:
+1. Error cause analysis
+2. Fix solution
+3. Fixed code
+4. Suggestions to prevent similar errors`,
         },
       },
       {
@@ -379,9 +379,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '调试专家',
+          label: 'Debugging Expert',
           systemPrompt:
-            '你是一位经验丰富的调试专家，擅长分析和解决各种编程问题。请提供:\n1. 清晰的错误原因分析\n2. 步骤化的调试指南\n3. 可行的修复方案\n4. 预防措施建议\n\n解释要简洁明了，方案要切实可行。',
+            'You are an experienced debugging expert specializing in analyzing and resolving various programming issues. Please provide:\n1. Clear error cause analysis\n2. Step-by-step debugging guide\n3. Feasible fix solutions\n4. Prevention measure suggestions\n\nExplanations should be concise and clear, solutions should be practical.',
           temperature: 0.3,
         },
       },
@@ -393,42 +393,42 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 7: 文档生成工作流
+  // Phase 7: Documentation Generation Workflow
   // ============================================
   {
     name: 'Documentation Generator',
-    description: '文档生成 - API文档、使用说明、开发文档',
+    description: 'Documentation Generation - API documentation, usage guides, development docs',
     nodes: [
       {
         id: 'trigger-docs',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始生成文档', triggerType: 'manual' },
+        data: { label: 'Start Documentation', triggerType: 'manual' },
       },
       {
         id: 'prompt-doc-req',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '文档需求',
-          prompt: `文档生成助手
+          label: 'Documentation Requirements',
+          prompt: `Documentation Generation Assistant
 
-请帮我生成项目文档：
+Please help me generate project documentation:
 
-文档类型: {docType|API文档}
-代码/模块: {code|src/api/user.js}
-文档风格: {style|JSDoc}
-输出文件: {output|docs/api.md}
+Documentation Type: {docType|API documentation}
+Code/Module: {code|src/api/user.js}
+Documentation Style: {style|JSDoc}
+Output File: {output|docs/api.md}
 
-请生成包含以下内容的文档：
-1. 概述和简介
-2. API接口/函数列表
-3. 参数说明
-4. 返回值说明
-5. 使用示例
-6. 注意事项
+Please generate documentation containing:
+1. Overview and introduction
+2. API interface/function list
+3. Parameter descriptions
+4. Return value descriptions
+5. Usage examples
+6. Important notes
 
-生成后请保存到指定文件。`,
+Please save to specified file after generation.`,
         },
       },
       {
@@ -436,9 +436,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '文档生成专家',
+          label: 'Documentation Generation Expert',
           systemPrompt:
-            '你是一位技术写作专家，擅长编写清晰、完整的技术文档。请生成:\n1. 结构清晰的文档\n2. 准确的技术描述\n3. 实用的代码示例\n4. 必要的注意事项\n\n文档应该易于理解，便于维护。生成后使用 file_write 工具保存。',
+            'You are a technical writing expert specializing in creating clear, complete technical documentation. Please generate:\n1. Well-structured documentation\n2. Accurate technical descriptions\n3. Practical code examples\n4. Necessary notes and warnings\n\nDocumentation should be easy to understand and maintain. Use file_write tool to save after generation.',
           temperature: 0.4,
         },
       },
@@ -446,7 +446,7 @@ export const presetWorkflows: PresetWorkflow[] = [
         id: 'tool-save-doc',
         type: 'tool',
         position: { x: 100, y: 410 },
-        data: { label: '保存文档文件', toolName: 'file_write' },
+        data: { label: 'Save Documentation File', toolName: 'file_write' },
       },
     ],
     edges: [
@@ -457,41 +457,41 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // 阶段 8: 部署发布工作流
+  // Phase 8: Deployment Workflow
   // ============================================
   {
     name: 'Deploy Helper',
-    description: '部署助手 - 构建配置、部署脚本、CI/CD',
+    description: 'Deployment Assistant - Build configuration, deployment scripts, CI/CD',
     nodes: [
       {
         id: 'trigger-deploy',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始部署', triggerType: 'manual' },
+        data: { label: 'Start Deployment', triggerType: 'manual' },
       },
       {
         id: 'prompt-deploy-req',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '部署需求',
-          prompt: `部署配置助手
+          label: 'Deployment Requirements',
+          prompt: `Deployment Configuration Assistant
 
-请帮我配置项目部署：
+Please help me configure project deployment:
 
-项目类型: {projectType|Node.js应用}
-部署环境: {environment|Linux服务器}
-部署方式: {method|Docker}
-输出文件: {output|deploy.sh}
+Project Type: {projectType|Node.js application}
+Deployment Environment: {environment|Linux server}
+Deployment Method: {method|Docker}
+Output File: {output|deploy.sh}
 
-请生成：
-1. 构建脚本
-2. Docker配置文件（如果需要）
-3. 部署脚本
-4. 环境变量说明
-5. 部署步骤文档
+Please generate:
+1. Build script
+2. Docker configuration file (if needed)
+3. Deployment script
+4. Environment variable description
+5. Deployment step documentation
 
-配置文件请保存，脚本文件请保存。`,
+Please save configuration files and script files.`,
         },
       },
       {
@@ -499,9 +499,9 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '部署专家',
+          label: 'Deployment Expert',
           systemPrompt:
-            '你是一位DevOps专家，擅长项目部署和CI/CD配置。请生成:\n1. 可用的构建脚本\n2. Docker配置（如果适用）\n3. 部署脚本\n4. 清晰的部署说明\n\n所有配置文件和脚本都需要使用 file_write 工具保存。',
+            'You are a DevOps expert specializing in project deployment and CI/CD configuration. Please generate:\n1. Usable build scripts\n2. Docker configuration (if applicable)\n3. Deployment scripts\n4. Clear deployment instructions\n\nAll configuration files and scripts must be saved using the file_write tool.',
           temperature: 0.3,
         },
       },
@@ -509,19 +509,19 @@ export const presetWorkflows: PresetWorkflow[] = [
         id: 'tool-save-build',
         type: 'tool',
         position: { x: 100, y: 410 },
-        data: { label: '保存构建脚本', toolName: 'file_write' },
+        data: { label: 'Save Build Script', toolName: 'file_write' },
       },
       {
         id: 'tool-save-docker',
         type: 'tool',
         position: { x: 250, y: 410 },
-        data: { label: '保存Dockerfile', toolName: 'file_write' },
+        data: { label: 'Save Dockerfile', toolName: 'file_write' },
       },
       {
         id: 'tool-save-deploy',
         type: 'tool',
         position: { x: 400, y: 410 },
-        data: { label: '保存部署脚本', toolName: 'file_write' },
+        data: { label: 'Save Deployment Script', toolName: 'file_write' },
       },
     ],
     edges: [
@@ -534,44 +534,45 @@ export const presetWorkflows: PresetWorkflow[] = [
   },
 
   // ============================================
-  // Yahoo Finance 股市查询工作流
+  // Yahoo Finance Stock Market Query Workflow
   // ============================================
   {
     name: 'Stock Market Analyzer',
-    description: '股市分析 - 通过Yahoo Finance API查询股票行情、分析趋势',
+    description:
+      'Stock Market Analysis - Query stock quotes and analyze trends via Yahoo Finance API',
     nodes: [
       {
         id: 'trigger-stock',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始查询', triggerType: 'manual' },
+        data: { label: 'Start Query', triggerType: 'manual' },
       },
       {
         id: 'prompt-stock-query',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '股票查询',
-          prompt: `股市分析助手
+          label: 'Stock Query',
+          prompt: `Stock Market Analysis Assistant
 
-请帮我查询和分析股票信息：
+Please help me query and analyze stock information:
 
-股票代码: {symbol|AAPL}
-查询内容: {queryType|实时行情}
-分析选项: {analysis|价格趋势、成交量、技术指标}
+Stock Symbol: {symbol|AAPL}
+Query Type: {queryType|Real-time quotes}
+Analysis Options: {analysis|Price trends, volume, technical indicators}
 
-可用查询类型：
-- 实时行情：当前价格、涨跌幅、成交量
-- 历史数据：指定时间范围的价格走势
-- 公司信息：基本面数据、财务指标
-- 技术分析：移动平均线、RSI、MACD等
-- 市场新闻：相关新闻和公告
+Available query types:
+- Real-time quotes: Current price, change, volume
+- Historical data: Price trends for specified time range
+- Company information: Fundamental data, financial metrics
+- Technical analysis: Moving averages, RSI, MACD, etc.
+- Market news: Related news and announcements
 
-请提供：
-1. 股票实时数据概览
-2. 技术分析图表（支持的工具描述）
-3. 趋势分析和预测
-4. 投资建议和风险提示`,
+Please provide:
+1. Stock real-time data overview
+2. Technical analysis charts (description of supported tools)
+3. Trend analysis and forecast
+4. Investment recommendations and risk warnings`,
         },
       },
       {
@@ -579,45 +580,45 @@ export const presetWorkflows: PresetWorkflow[] = [
         type: 'agent',
         position: { x: 100, y: 300 },
         data: {
-          label: '股市分析师',
-          systemPrompt: `你是一位专业的股市分析师，擅长技术分析和基本面分析。
+          label: 'Stock Market Analyst',
+          systemPrompt: `You are a professional stock market analyst specializing in technical analysis and fundamental analysis.
 
-## 主要能力
+## Main Capabilities
 
-1. **股票数据查询**
-   - **优先使用 stock_quote 工具**获取Yahoo Finance实时数据
-   - stock_quote 参数：symbols (股票代码，多个用逗号分隔), fields (可选: "price", "quote", "summary", "all")
-   - 备用方案：使用 http_request 工具（注意：不要用browser_navigate或web_fetch）
-   - 支持的API端点：
-     - 实时行情: https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}
-     - 历史数据: https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}?interval=1d&range=1mo
-     - 公司信息: https://query1.finance.yahoo.com/v10/finance/quoteSummary/{SYMBOL}?modules=summaryProfile
+1. **Stock Data Query**
+   - **Priority: Use stock_quote tool** to get Yahoo Finance real-time data
+   - stock_quote parameters: symbols (stock symbols, comma-separated for multiple), fields (optional: "price", "quote", "summary", "all")
+   - Backup: Use http_request tool (Note: do not use browser_navigate or web_fetch)
+   - Supported API endpoints:
+     - Real-time quotes: https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}
+     - Historical data: https://query1.finance.yahoo.com/v8/finance/chart/{SYMBOL}?interval=1d&range=1mo
+     - Company information: https://query1.finance.yahoo.com/v10/finance/quoteSummary/{SYMBOL}?modules=summaryProfile
 
-   **美股指数代码**：
-   - 道琼斯工业指数: ^DJI
-   - 标普500指数: ^GSPC
-   - 纳斯达克综合指数: ^IXIC
-   - 罗素2000指数: ^RUT
+   **US Stock Index Codes**：
+   - Dow Jones Industrial Average: ^DJI
+   - S&P 500 Index: ^GSPC
+   - NASDAQ Composite Index: ^IXIC
+   - Russell 2000 Index: ^RUT
 
-2. **技术分析**
-   - 移动平均线（MA5, MA10, MA20, MA50, MA200）
-   - 相对强弱指数（RSI）
-   - MACD指标
-   - 成交量分析
-   - 支撑位和阻力位
+2. **Technical Analysis**
+   - Moving Averages (MA5, MA10, MA20, MA50, MA200)
+   - Relative Strength Index (RSI)
+   - MACD Indicator
+   - Volume Analysis
+   - Support and Resistance Levels
 
-3. **基本面分析**
-   - 市盈率（P/E）
-   - 市净率（P/B）
-   - 股息率
-   - 营收和利润增长
-   - 行业对比
+3. **Fundamental Analysis**
+   - Price-to-Earnings Ratio (P/E)
+   - Price-to-Book Ratio (P/B)
+   - Dividend Yield
+   - Revenue and Profit Growth
+   - Industry Comparison
 
-## 数据查询方式
+## Data Query Methods
 
-**重要：优先使用 stock_quote 工具获取Yahoo Finance数据**
+**Important: Prioritize using stock_quote tool to get Yahoo Finance data**
 
-stock_quote工具使用示例：
+stock_quote tool usage example:
 \`\`\`json
 {
   "tool": "stock_quote",
@@ -628,7 +629,7 @@ stock_quote工具使用示例：
 }
 \`\`\`
 
-查询多个指数：
+Query multiple indices:
 \`\`\`json
 {
   "tool": "stock_quote",
@@ -639,7 +640,7 @@ stock_quote工具使用示例：
 }
 \`\`\`
 
-备用方案：使用 http_request 工具
+Backup: Use http_request tool
 \`\`\`json
 {
   "tool": "http_request",
@@ -651,9 +652,9 @@ stock_quote工具使用示例：
 }
 \`\`\`
 
-## Yahoo Finance API返回数据解析
+## Yahoo Finance API Response Data Parsing
 
-API返回的JSON结构：
+API returns JSON structure:
 \`\`\`json
 {
   "chart": {
@@ -675,59 +676,59 @@ API返回的JSON结构：
 }
 \`\`\`
 
-常用字段：
-- regularMarketPrice: 当前价格
-- previousClose: 前收盘价
-- regularMarketChange: 涨跌额
-- regularMarketChangePercent: 涨跌幅
-- regularMarketVolume: 成交量
+Common fields:
+- regularMarketPrice: Current price
+- previousClose: Previous close price
+- regularMarketChange: Change amount
+- regularMarketChangePercent: Change percentage
+- regularMarketVolume: Volume
 
-返回JSON数据包含：
-- meta: 交易时间、货币单位
-- chart: 结果数组
-- quote: 实时报价（最新价、涨跌、成交量等）
-- timestamp: 时间戳数组
+Returned JSON data includes:
+- meta: Trading time, currency unit
+- chart: Result array
+- quote: Real-time quotes (latest price, change, volume, etc.)
+- timestamp: Timestamp array
 
-## 分析输出格式
+## Analysis Output Format
 
-请按以下格式输出分析结果：
+Please output analysis results in the following format:
 
-### 📊 {股票名称} ({代码}) - 实时行情
+### 📊 {Stock Name} ({Symbol}) - Real-time Quotes
 
-| 指标 | 数值 |
+| Metric | Value |
 |------|------|
-| 当前价格 | $xxx.xx |
-| 涨跌幅 | +x.xx% |
-| 成交量 | xxx万 |
-| 开盘价 | $xxx.xx |
-| 最高价 | $xxx.xx |
-| 最低价 | $xxx.xx |
+| Current Price | $xxx.xx |
+| Change | +x.xx% |
+| Volume | xxx million |
+| Open Price | $xxx.xx |
+| High Price | $xxx.xx |
+| Low Price | $xxx.xx |
 
-### 📈 技术分析
+### 📈 Technical Analysis
 
-- **趋势判断**: 上升/下降/震荡
-- **支撑位**: $xxx
-- **阻力位**: $xxx
-- **技术指标**: MA/RSI/MACD分析
+- **Trend**: Uptrend/Downtrend/Sideways
+- **Support Level**: $xxx
+- **Resistance Level**: $xxx
+- **Technical Indicators**: MA/RSI/MACD analysis
 
-### 💡 投资建议
+### 💡 Investment Recommendation
 
-- **风险评级**: 低/中/高
-- **操作建议**: 买入/持有/卖出
-- **目标价位**: $xxx - $xxx
+- **Risk Rating**: Low/Medium/High
+- **Action**: Buy/Hold/Sell
+- **Target Price**: $xxx - $xxx
 
-### ⚠️ 风险提示
+### ⚠️ Risk Warning
 
-列出相关风险因素
+List relevant risk factors
 
-## 注意事项
+## Important Notes
 
-- 数据可能有延迟，建议确认数据时效性
-- 投资有风险，建议仅供参考
-- 结合多个指标综合判断
-- 注意市场整体环境影响
+- Data may be delayed, verify data timeliness
+- Investment involves risks, recommendations are for reference only
+- Combine multiple indicators for comprehensive assessment
+- Pay attention to overall market environment impact
 
-请以专业、客观的态度提供分析服务。`,
+Please provide analysis services with a professional, objective attitude.`,
           temperature: 0.4,
           enabledTools: ['stock_quote', 'http_request', 'web_search', 'get_time'],
           maxIterations: 8,
@@ -741,45 +742,45 @@ API返回的JSON结构：
   },
 
   // ============================================
-  // Claude Code 风格开发工作流
+  // Claude Code Style Development Workflow
   // ============================================
   {
     name: 'Code Development',
-    description: 'Claude Code风格 - 自动读取、编辑、测试代码',
+    description: 'Claude Code Style - Automatically read, edit, and test code',
     nodes: [
       {
         id: 'trigger-dev',
         type: 'trigger',
         position: { x: 100, y: 50 },
-        data: { label: '开始开发', triggerType: 'manual' },
+        data: { label: 'Start Development', triggerType: 'manual' },
       },
       {
         id: 'prompt-dev-task',
         type: 'prompt',
         position: { x: 100, y: 150 },
         data: {
-          label: '开发任务',
-          prompt: `代码开发助手 (Claude Code 模式)
+          label: 'Development Task',
+          prompt: `Code Development Assistant (Claude Code Mode)
 
-请帮我完成以下开发任务：
+Please help me complete the following development task:
 
-任务描述: {task|添加用户认证功能}
-项目路径: {projectPath|./}
-相关文件: {files|src/auth/login.js}
+Task Description: {task|Add user authentication functionality}
+Project Path: {projectPath|./}
+Related Files: {files|src/auth/login.js}
 
-工作流程：
-1. 使用 file_read 读取相关文件
-2. 分析代码并实现需求
-3. 使用 file_write 保存修改后的代码
-4. 如果需要，使用 execute_command 运行测试
+Workflow:
+1. Use file_read to read related files
+2. Analyze code and implement requirements
+3. Use file_write to save modified code
+4. If needed, use execute_command to run tests
 
-注意事项：
-- 读取文件前先确认文件路径
-- 修改代码时保持代码风格一致
-- 保存文件前确认修改正确
-- 遇到错误时提供详细的错误信息
+Important Notes:
+- Confirm file path before reading files
+- Maintain consistent code style when modifying code
+- Verify modifications are correct before saving files
+- Provide detailed error information when encountering errors
 
-请开始执行任务。`,
+Please start executing the task.`,
         },
       },
       {
@@ -787,57 +788,57 @@ API返回的JSON结构：
         type: 'agent',
         position: { x: 100, y: 280 },
         data: {
-          label: '开发助手',
-          systemPrompt: `你是一位经验丰富的软件开发工程师，类似于 Claude Code。你的任务是帮助用户完成各种开发任务。
+          label: 'Development Assistant',
+          systemPrompt: `You are an experienced software development engineer, similar to Claude Code. Your task is to help users complete various development tasks.
 
-## 工作流程
+## Workflow
 
-1. **确认工作目录**: 首先询问用户想在哪个目录创建项目，或使用 get_work_directory 查看当前设置
-2. **设置工作目录**（如需要）: 使用 set_work_directory 设置用户指定的目录
-3. **理解任务**: 仔细理解用户的开发需求
-4. **读取文件**: 使用 file_read 工具读取相关文件内容
-5. **分析代码**: 分析现有代码结构，确定修改方案
-6. **实现修改**: 编写或修改代码
-7. **保存文件**: 使用 file_write 工具保存修改后的代码
-8. **验证结果**: 如果需要，使用 execute_command 运行测试
+1. **Confirm Working Directory**: First ask the user where they want to create the project, or use get_work_directory to check current settings
+2. **Set Working Directory** (if needed): Use set_work_directory to set the user-specified directory
+3. **Understand Task**: Carefully understand the user's development requirements
+4. **Read Files**: Use file_read tool to read related file contents
+5. **Analyze Code**: Analyze existing code structure, determine modification plan
+6. **Implement Changes**: Write or modify code
+7. **Save Files**: Use file_write tool to save modified code
+8. **Verify Results**: If needed, use execute_command to run tests
 
-## 工具使用规范
+## Tool Usage Guidelines
 
-- **get_work_directory**: 查看当前工作目录（文件将被创建在哪里）
-- **set_work_directory**: 设置工作目录到用户指定的位置（使用绝对路径）
-  - Windows示例: "D:\\\\MyProjects" 或 "C:\\\\Users\\\\Username\\\\Documents\\\\MyProjects"
-  - macOS/Linux示例: "/Users/username/projects"或 "/home/username/projects"
-- **file_read**: 读取文件内容
-- **file_write**: 保存文件时，提供完整的文件内容
-- **file_list**: 当需要查找文件时使用
-- **execute_command**: 运行测试命令（如 npm test）
-- **web_search**: 查找技术文档或解决方案
+- **get_work_directory**: Check current working directory (where files will be created)
+- **set_work_directory**: Set working directory to user-specified location (use absolute path)
+  - Windows example: "D:\\\\MyProjects" or "C:\\\\Users\\\\Username\\\\Documents\\\\MyProjects"
+  - macOS/Linux example: "/Users/username/projects" or "/home/username/projects"
+- **file_read**: Read file contents
+- **file_write**: Save files, provide complete file content
+- **file_list**: Use when searching for files
+- **execute_command**: Run test commands (such as npm test)
+- **web_search**: Find technical documentation or solutions
 
-## 代码规范
+## Code Standards
 
-- 保持现有代码风格
-- 添加必要的注释
-- 确保代码可读性
-- 遵循最佳实践
+- Maintain existing code style
+- Add necessary comments
+- Ensure code readability
+- Follow best practices
 
-## 重要提示
+## Important Notes
 
-- **开始前先确认工作目录**: 询问用户想在哪个目录创建项目
-- **每次只能修改一个文件**
-- **保存文件前再次确认内容正确**
-- **如果遇到错误，提供详细的错误信息和解决方案**
-- **完成任务后总结所做的修改**
+- **Confirm working directory before starting**: Ask the user where they want to create the project
+- **Only modify one file at a time**
+- **Verify content is correct again before saving files**
+- **If encountering errors, provide detailed error information and solutions**
+- **Summarize changes made after completing the task**
 
-## 默认工作目录
+## Default Working Directory
 
-默认情况下，文件会被创建在用户的主目录下的 DeskClawProjects 文件夹中。
-- Windows: C:\\Users\\你的用户名\\DeskClawProjects
-- macOS: /Users/你的用户名/DeskClawProjects
-- Linux: /home/你的用户名/DeskClawProjects
+By default, files will be created in the DeskClawProjects folder in the user's home directory.
+- Windows: C:\\Users\\YourUsername\\DeskClawProjects
+- macOS: /Users/yourusername/DeskClawProjects
+- Linux: /home/yourusername/DeskClawProjects
 
-如果用户想在其他位置创建项目，请使用 set_work_directory 工具设置。
+If the user wants to create a project in another location, please use the set_work_directory tool to set it.
 
-请以专业、细致的方式完成每个开发任务。`,
+Please complete each development task in a professional, meticulous manner.`,
           temperature: 0.3,
           enabledTools: [
             'get_work_directory',
