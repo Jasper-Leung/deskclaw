@@ -123,36 +123,34 @@ Please generate and save the following files:
         position: { x: 100, y: 280 },
         data: {
           label: 'Project Initialization Expert',
+          modelId: 'default',
           systemPrompt:
-            'You are a DevOps expert specializing in project initialization and configuration. Your tasks:\n1. Generate appropriate configuration files based on project type\n2. Use file_write tool to save each configuration file\n3. Create clear project structure documentation\n4. Include common dependencies and scripts\n\nEach file must be saved separately using the file_write tool.',
+            'You are a DevOps expert specializing in project initialization and configuration. ' +
+            'Your tasks:\n' +
+            '1. Generate appropriate configuration files based on project type\n' +
+            '2. Create clear project structure documentation\n' +
+            '3. Include common dependencies and scripts\n' +
+            '4. IMPORTANT: You MUST use the file_write tool to save each configuration file\n' +
+            '\n' +
+            'Files to generate based on user requirements:\n' +
+            '- package.json: Project configuration and dependencies\n' +
+            '- README.md: Project documentation\n' +
+            '- .gitignore: Git ignore configuration\n' +
+            '\n' +
+            'Use the file_write tool with these parameters:\n' +
+            '- filepath: the file path (e.g., "package.json")\n' +
+            '- content: the file content\n' +
+            '\n' +
+            'Each file must be saved separately using the file_write tool.',
           temperature: 0.3,
+          enabledTools: ['file_write'],
+          maxIterations: 8,
         },
-      },
-      {
-        id: 'tool-write-package',
-        type: 'tool',
-        position: { x: 100, y: 410 },
-        data: { label: 'Save package.json', toolName: 'file_write' },
-      },
-      {
-        id: 'tool-write-readme',
-        type: 'tool',
-        position: { x: 250, y: 410 },
-        data: { label: 'Save README.md', toolName: 'file_write' },
-      },
-      {
-        id: 'tool-write-gitignore',
-        type: 'tool',
-        position: { x: 400, y: 410 },
-        data: { label: 'Save .gitignore', toolName: 'file_write' },
       },
     ],
     edges: [
       { id: 'e3', source: 'trigger-setup', target: 'prompt-setup-params' },
       { id: 'e4', source: 'prompt-setup-params', target: 'agent-setup' },
-      { id: 'e5', source: 'agent-setup', target: 'tool-write-package' },
-      { id: 'e6', source: 'agent-setup', target: 'tool-write-readme' },
-      { id: 'e7', source: 'agent-setup', target: 'tool-write-gitignore' },
     ],
   },
 
@@ -199,22 +197,32 @@ Please save to the specified file after generation`,
         position: { x: 100, y: 280 },
         data: {
           label: 'Code Generator',
+          modelId: 'default',
           systemPrompt:
-            'You are a senior software engineer specializing in writing clear, maintainable code. Your tasks:\n1. Generate complete, usable code based on requirements\n2. Add detailed comments\n3. Implement comprehensive error handling\n4. Follow best practices and design patterns\n5. Use file_write tool to save code to file after generation\n\nImportant: You must use the file_write tool to save code to the specified file!',
+            'You are a senior software engineer specializing in writing clear, maintainable code. ' +
+            'Your tasks:\n' +
+            '1. Generate complete, usable code based on requirements\n' +
+            '2. Add detailed comments\n' +
+            '3. Implement comprehensive error handling\n' +
+            '4. Follow best practices and design patterns\n' +
+            '5. IMPORTANT: You MUST use the file_write tool to save code to file after generation\n' +
+            '\n' +
+            'The user will specify a file path (e.g., "src/auth/login.js"). Use that exact path for the filepath parameter.\n' +
+            'Use the file_write tool with these parameters:\n' +
+            '- filepath: the file path specified by the user\n' +
+            '- content: the generated code\n' +
+            '\n' +
+            'Example tool call:\n' +
+            '{"tool": "file_write", "parameters": {"filepath": "src/auth/login.js", "content": "..."}}',
           temperature: 0.4,
+          enabledTools: ['file_write'],
+          maxIterations: 5,
         },
-      },
-      {
-        id: 'tool-save-code',
-        type: 'tool',
-        position: { x: 100, y: 410 },
-        data: { label: 'Save Code File', toolName: 'file_write' },
       },
     ],
     edges: [
       { id: 'e8', source: 'trigger-coding', target: 'prompt-code-req' },
       { id: 'e9', source: 'prompt-code-req', target: 'agent-coder' },
-      { id: 'e10', source: 'agent-coder', target: 'tool-save-code' },
     ],
   },
 
@@ -318,22 +326,31 @@ Please save to test file after generation.`,
         position: { x: 100, y: 280 },
         data: {
           label: 'Test Development Expert',
+          modelId: 'default',
           systemPrompt:
-            'You are a test development expert specializing in writing comprehensive test cases. Please generate:\n1. Normal scenario tests\n2. Boundary value tests\n3. Exception handling tests\n4. Mock and Stub configuration\n\nTests should be concise, clear, easy to understand and maintain. Use file_write tool to save test files after generation.',
+            'You are a test development expert specializing in writing comprehensive test cases. ' +
+            'Please generate:\n' +
+            '1. Normal scenario tests\n' +
+            '2. Boundary value tests\n' +
+            '3. Exception handling tests\n' +
+            '4. Mock and Stub configuration\n' +
+            '\n' +
+            'IMPORTANT: You MUST use the file_write tool to save test files after generation.\n' +
+            'Tests should be concise, clear, easy to understand and maintain.\n' +
+            '\n' +
+            'The user will specify a test file path (e.g., "src/utils.test.js"). Use that exact path for the filepath parameter.\n' +
+            'Use the file_write tool with these parameters:\n' +
+            '- filepath: the test file path specified by the user\n' +
+            '- content: the generated test code',
           temperature: 0.3,
+          enabledTools: ['file_write'],
+          maxIterations: 5,
         },
-      },
-      {
-        id: 'tool-save-test',
-        type: 'tool',
-        position: { x: 100, y: 410 },
-        data: { label: 'Save Test File', toolName: 'file_write' },
       },
     ],
     edges: [
       { id: 'e13', source: 'trigger-test', target: 'prompt-test-req' },
       { id: 'e14', source: 'prompt-test-req', target: 'agent-tester' },
-      { id: 'e15', source: 'agent-tester', target: 'tool-save-test' },
     ],
   },
 
@@ -509,36 +526,30 @@ Please save configuration files and script files.`,
         position: { x: 100, y: 280 },
         data: {
           label: 'Deployment Expert',
+          modelId: 'default',
           systemPrompt:
-            'You are a DevOps expert specializing in project deployment and CI/CD configuration. Please generate:\n1. Usable build scripts\n2. Docker configuration (if applicable)\n3. Deployment scripts\n4. Clear deployment instructions\n\nAll configuration files and scripts must be saved using the file_write tool.',
+            'You are a DevOps expert specializing in project deployment and CI/CD configuration. ' +
+            'Please generate:\n' +
+            '1. Usable build scripts\n' +
+            '2. Docker configuration (if applicable)\n' +
+            '3. Deployment scripts\n' +
+            '4. Clear deployment instructions\n' +
+            '\n' +
+            'IMPORTANT: All configuration files and scripts must be saved using the file_write tool.\n' +
+            'The user will specify an output file path. Use file_write with parameters:\n' +
+            '- filepath: the file path specified by the user\n' +
+            '- content: the generated file content\n' +
+            '\n' +
+            'Save each file separately (e.g., "build.sh", "Dockerfile", "deploy.sh").',
           temperature: 0.3,
+          enabledTools: ['file_write'],
+          maxIterations: 8,
         },
-      },
-      {
-        id: 'tool-save-build',
-        type: 'tool',
-        position: { x: 100, y: 410 },
-        data: { label: 'Save Build Script', toolName: 'file_write' },
-      },
-      {
-        id: 'tool-save-docker',
-        type: 'tool',
-        position: { x: 250, y: 410 },
-        data: { label: 'Save Dockerfile', toolName: 'file_write' },
-      },
-      {
-        id: 'tool-save-deploy',
-        type: 'tool',
-        position: { x: 400, y: 410 },
-        data: { label: 'Save Deployment Script', toolName: 'file_write' },
       },
     ],
     edges: [
       { id: 'e21', source: 'trigger-deploy', target: 'prompt-deploy-req' },
       { id: 'e22', source: 'prompt-deploy-req', target: 'agent-deployer' },
-      { id: 'e23', source: 'agent-deployer', target: 'tool-save-build' },
-      { id: 'e24', source: 'agent-deployer', target: 'tool-save-docker' },
-      { id: 'e25', source: 'agent-deployer', target: 'tool-save-deploy' },
     ],
   },
 
@@ -866,6 +877,152 @@ Please complete each development task in a professional, meticulous manner.`,
     edges: [
       { id: 'e-dev-1', source: 'trigger-dev', target: 'prompt-dev-task' },
       { id: 'e-dev-2', source: 'prompt-dev-task', target: 'agent-developer' },
+    ],
+  },
+
+  // ============================================
+  // Workflow Generator - Create custom workflows
+  // ============================================
+  {
+    name: 'Workflow Generator',
+    description: 'Create custom workflows from natural language descriptions',
+    nodes: [
+      {
+        id: 'trigger-wf-gen',
+        type: 'trigger',
+        position: { x: 100, y: 50 },
+        data: { label: 'Start Workflow Creation', triggerType: 'manual' },
+      },
+      {
+        id: 'prompt-wf-description',
+        type: 'prompt',
+        position: { x: 100, y: 150 },
+        data: {
+          label: 'Workflow Description',
+          prompt: `Workflow Generator Assistant
+
+Please help me create a custom workflow:
+
+Workflow Name: {name|My Custom Workflow}
+Workflow Description: {description|A workflow that processes files and generates reports}
+Workflow Steps: {steps|
+1. Read input files from a directory
+2. Process each file with a custom function
+3. Generate a summary report
+4. Save the report to a file
+}
+
+Additional Requirements: {requirements|Use file_read and file_write tools}
+
+Please generate a complete workflow that can be saved and executed.`,
+        },
+      },
+      {
+        id: 'agent-wf-generator',
+        type: 'agent',
+        position: { x: 100, y: 280 },
+        data: {
+          label: 'Workflow Architect',
+          modelId: 'default',
+          systemPrompt: `You are a workflow architect expert. Your task is to design and create complete, executable workflows based on natural language descriptions.
+
+## Workflow Structure
+
+A workflow consists of:
+1. **Nodes** - Each node performs a specific action:
+   - **trigger**: Starts the workflow (manual or scheduled)
+   - **prompt**: Collects user input with parameters
+   - **agent**: Uses AI to process tasks with optional tools
+   - **tool**: Executes specific tools (currently handled by agent tools)
+   - **shell**: Executes shell commands (with approval)
+   - **conditional**: Branches workflow based on conditions
+
+2. **Edges** - Connect nodes to define execution order
+
+## Node ID Format
+
+Use descriptive IDs like: "trigger-step1", "prompt-user-input", "agent-processor", "agent-saver"
+
+## JSON Workflow Format
+
+Generate a workflow JSON structure:
+
+\`\`\`json
+{
+  "name": "Workflow Name",
+  "description": "Workflow description",
+  "nodes": [
+    {
+      "id": "trigger-start",
+      "type": "trigger",
+      "position": { "x": 100, "y": 50 },
+      "data": { "label": "Start", "triggerType": "manual" }
+    },
+    {
+      "id": "prompt-input",
+      "type": "prompt",
+      "position": { "x": 100, "y": 150 },
+      "data": {
+        "label": "Input Configuration",
+        "prompt": "Your prompt with {param|default} placeholders"
+      }
+    },
+    {
+      "id": "agent-worker",
+      "type": "agent",
+      "position": { "x": 100, "y": 280 },
+      "data": {
+        "label": "Worker Agent",
+        "modelId": "default",
+        "systemPrompt": "Your agent instructions...",
+        "temperature": 0.4,
+        "enabledTools": ["file_read", "file_write", "web_search"],
+        "maxIterations": 5
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "trigger-start", "target": "prompt-input" },
+    { "id": "e2", "source": "prompt-input", "target": "agent-worker" }
+  ]
+}
+\`\`\`
+
+## Available Tools for Agents
+
+- file_read: Read file contents (filepath parameter)
+- file_write: Write file contents (filepath, content parameters)
+- web_search: Search the web for information (query parameter)
+- http_request: Make HTTP requests (url, method, headers parameters)
+- stock_quote: Query stock data (symbols, fields parameters)
+- get_time: Get current time (no parameters)
+- execute_command: Run shell commands (command parameter)
+
+## Position Coordinates
+
+Use vertical spacing of 130-150px between connected nodes:
+- Trigger: y = 50
+- Prompt: y = 150
+- Agent: y = 280
+- Additional agent: y = 410, 540, etc.
+
+## Output Format
+
+Provide:
+1. A brief overview of the workflow design
+2. The complete workflow JSON code block
+3. Instructions on how to use the workflow
+
+Generate a practical, executable workflow that matches the user's requirements.`,
+          temperature: 0.3,
+          enabledTools: ['web_search'],
+          maxIterations: 3,
+        },
+      },
+    ],
+    edges: [
+      { id: 'e-wf-1', source: 'trigger-wf-gen', target: 'prompt-wf-description' },
+      { id: 'e-wf-2', source: 'prompt-wf-description', target: 'agent-wf-generator' },
     ],
   },
 ];
