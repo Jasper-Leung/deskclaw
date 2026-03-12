@@ -8,8 +8,9 @@ import { ipcMain, BrowserWindow } from 'electron';
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/index.js';
 import { channelRegistry } from '../channels/channel-registry.js';
-import { channelRouter } from '../channels/channel-router.js';
+import { channelRouter, type ConversationConfig } from '../channels/channel-router.js';
 import type { ChannelMessage } from '../channels/channel-plugin.js';
+import * as quickChat from '../quick-chat/settings.js';
 
 // Import channel implementations to register them
 import '../channels/index.js';
@@ -21,6 +22,34 @@ let mainWindow: BrowserWindow | null = null;
  */
 export const setChannelsMainWindow = (window: BrowserWindow | null): void => {
   mainWindow = window;
+};
+
+/**
+ * Default conversation configuration for channels
+ */
+const DEFAULT_CONVERSATION_CONFIG: ConversationConfig = {
+  timeWindowMs: 30 * 60 * 1000, // 30 minutes
+  maxMessages: 20,
+  enableAutoReset: true,
+};
+
+/**
+ * Global conversation configuration (can be updated)
+ */
+let conversationConfig: ConversationConfig = { ...DEFAULT_CONVERSATION_CONFIG };
+
+/**
+ * Update conversation configuration
+ */
+export const setConversationConfig = (config: Partial<ConversationConfig>): void => {
+  conversationConfig = { ...conversationConfig, ...config };
+};
+
+/**
+ * Get current conversation configuration
+ */
+export const getConversationConfig = (): ConversationConfig => {
+  return { ...conversationConfig };
 };
 
 /**
@@ -49,11 +78,25 @@ function saveMessage(db: Database.Database, msg: ChannelMessage): void {
 }
 
 /**
- * Handle incoming message and trigger AI response if configured
+ * Handle incoming message and trigger AI response using llm-enhanced
  */
-async function handleIncomingMessage(db: Database.Database, msg: ChannelMessage): Promise<void> {
+async function handleIncomingMessage(
+  db: Database.Database,
+  msg: ChannelMessage,
+  config: ConversationConfig = conversationConfig
+): Promise<void> {
   // Check if auto-reply is enabled for this channel/peer
-  const autoReplyEnabled = channelRouter.isAutoReplyEnabled(msg.channelId, msg.peerId);
+  let autoReplyEnabled = channelRouter.isAutoReplyEnabled(msg.channelId, msg.peerId);
+
+  // Auto-enable autoReply for new peers
+  if (!autoReplyEnabled) {
+    const session = channelRouter.getPeerSession(msg.channelId, msg.peerId);
+    if (!session) {
+      channelRouter.setAutoReply(msg.channelId, msg.peerId, true);
+      autoReplyEnabled = true;
+      console.log(`[Channels] Auto-enabled autoReply for new peer: ${msg.peerId}`);
+    }
+  }
 
   if (!autoReplyEnabled) {
     return;
@@ -70,7 +113,7 @@ async function handleIncomingMessage(db: Database.Database, msg: ChannelMessage)
     return;
   }
 
-  // Create or get session for this peer
+  // Get or create session for this peer
   const sessionTitle = `chat:${msg.channelId}:${msg.peerId}`;
   let session = db.prepare('SELECT id FROM sessions WHERE title = ?').get(sessionTitle) as
     | { id: string }
@@ -79,18 +122,31 @@ async function handleIncomingMessage(db: Database.Database, msg: ChannelMessage)
   if (!session) {
     const sessionId = crypto.randomUUID();
     db.prepare(
-      `
-      INSERT INTO sessions (id, title, messages_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-    `
+      `INSERT INTO sessions (id, title, messages_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`
     ).run(sessionId, sessionTitle, '[]', Date.now(), Date.now());
     session = { id: sessionId };
-
-    // Map peer to session
     channelRouter.mapPeerToSession(msg.channelId, msg.peerId, sessionId);
   }
 
-  // Add message to session
+  // Check if we should start a new conversation
+  if (
+    config.enableAutoReset &&
+    channelRouter.shouldStartNewConversation(
+      msg.channelId,
+      msg.peerId,
+      config.timeWindowMs,
+      config.maxMessages
+    )
+  ) {
+    channelRouter.startNewConversation(msg.channelId, msg.peerId, db);
+    console.log(`[Channels] Auto-started new conversation for ${msg.channelId}:${msg.peerId}`);
+  }
+
+  // Get Quick Chat configuration (reuse Agent and memory settings)
+  const sessionConfig = quickChat.getQuickChatSessionConfig(db);
+
+  // Add user message to session
   const messagesJson = db
     .prepare('SELECT messages_json FROM sessions WHERE id = ?')
     .get(session.id) as { messages_json: string };
@@ -108,13 +164,88 @@ async function handleIncomingMessage(db: Database.Database, msg: ChannelMessage)
     session.id
   );
 
-  // Trigger AI response via stream
-  if (mainWindow) {
-    mainWindow.webContents.send('channels:autoReply', {
-      sessionId: session.id,
-      channelId: msg.channelId,
-      peerId: msg.peerId,
-    });
+  // Update conversation state
+  channelRouter.updateConversation(msg.channelId, msg.peerId, msg.content || '');
+
+  // Generate AI response using llm-enhanced
+  try {
+    if (sessionConfig.agentId) {
+      // Use llm-enhanced with memory support
+      const { streamChat } = await import('../ipc/llm-enhanced.js');
+
+      let responseContent = '';
+      const modelToUse = sessionConfig.modelId || defaultModel;
+
+      for await (const chunk of streamChat(
+        db,
+        {
+          model: modelToUse,
+          messages,
+          temperature: sessionConfig.temperature ?? 0.7,
+          maxTokens: 4096,
+        },
+        {
+          agentId: sessionConfig.agentId,
+          enabled: sessionConfig.memoryOptions?.enabled ?? true,
+          maxMemories: sessionConfig.memoryOptions?.maxMemories ?? 5,
+          minImportance: sessionConfig.memoryOptions?.minImportance ?? 0.5,
+          useSemantic: true,
+        }
+      )) {
+        if (!chunk.done) {
+          responseContent += chunk.content;
+        }
+      }
+
+      // Send response back to channel
+      if (responseContent) {
+        const channelRow = db
+          .prepare('SELECT channel_type FROM channels WHERE id = ?')
+          .get(msg.channelId) as { channel_type: string } | undefined;
+
+        if (channelRow) {
+          const plugin = channelRegistry.getPlugin(channelRow.channel_type);
+
+          if (plugin?.sendMessage) {
+            await plugin.sendMessage(msg.peerId, responseContent);
+
+            // Save assistant response to session
+            messages.push({
+              role: 'assistant',
+              content: responseContent,
+              timestamp: Date.now(),
+            });
+            db.prepare('UPDATE sessions SET messages_json = ?, updated_at = ? WHERE id = ?').run(
+              JSON.stringify(messages),
+              Date.now(),
+              session.id
+            );
+
+            console.log(`[Channels] Sent AI response to ${msg.channelId}:${msg.peerId}`);
+          }
+        }
+      }
+    } else {
+      // No Agent configured, fall back to frontend processing
+      if (mainWindow) {
+        mainWindow.webContents.send('channels:autoReply', {
+          sessionId: session.id,
+          channelId: msg.channelId,
+          peerId: msg.peerId,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[Channels] AI response failed:', error);
+
+    // Forward to frontend as fallback
+    if (mainWindow) {
+      mainWindow.webContents.send('channels:autoReply', {
+        sessionId: session.id,
+        channelId: msg.channelId,
+        peerId: msg.peerId,
+      });
+    }
   }
 }
 
@@ -440,5 +571,42 @@ export const registerChannelsHandlers = (): void => {
       // Clean up
       await plugin.stop();
     }
+  });
+
+  // ============================================================================
+  // CONVERSATION MANAGEMENT HANDLERS
+  // ============================================================================
+
+  // Reset conversation for a specific peer (manual trigger)
+  ipcMain.handle('channels:resetConversation', async (_, channelId, peerId) => {
+    channelRouter.resetConversation(channelId, peerId, db);
+    return { success: true };
+  });
+
+  // Get conversation state for a peer
+  ipcMain.handle('channels:getConversation', (_, channelId, peerId) => {
+    return channelRouter.getConversation(channelId, peerId);
+  });
+
+  // Get all conversations
+  ipcMain.handle('channels:getAllConversations', () => {
+    return channelRouter.getAllConversations();
+  });
+
+  // Clear conversation state for a peer
+  ipcMain.handle('channels:clearConversation', (_, channelId, peerId) => {
+    channelRouter.clearConversation(channelId, peerId);
+    return { success: true };
+  });
+
+  // Get current conversation configuration
+  ipcMain.handle('channels:getConversationConfig', () => {
+    return getConversationConfig();
+  });
+
+  // Update conversation configuration
+  ipcMain.handle('channels:setConversationConfig', (_, config) => {
+    setConversationConfig(config);
+    return { success: true, config: getConversationConfig() };
   });
 };

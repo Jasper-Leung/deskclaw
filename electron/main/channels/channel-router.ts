@@ -20,6 +20,27 @@ interface PeerSession {
 }
 
 /**
+ * Conversation state for tracking conversation turns
+ */
+export interface ConversationState {
+  channelId: string;
+  peerId: string;
+  sessionId: string; // Database session ID (for memory association)
+  messageCount: number; // Message count in current conversation
+  lastMessageTime: number; // Timestamp of last message
+  conversationStartTime: number; // When this conversation started
+}
+
+/**
+ * Conversation configuration
+ */
+export interface ConversationConfig {
+  timeWindowMs: number; // Time window for auto-reset
+  maxMessages: number; // Max messages before auto-reset
+  enableAutoReset: boolean; // Enable automatic conversation reset
+}
+
+/**
  * Message routing options
  */
 export interface RoutingOptions {
@@ -36,6 +57,7 @@ export interface RoutingOptions {
  */
 export class ChannelRouter {
   private peerSessions = new Map<string, PeerSession>();
+  private conversations = new Map<string, ConversationState>();
   private messageHandlers: Array<(message: ChannelMessage) => Promise<boolean>> = [];
 
   /**
@@ -202,6 +224,129 @@ export class ChannelRouter {
       activeSessions24h: sessions.filter((s) => s.lastActivity >= cutoff).length,
       autoReplyEnabled: sessions.filter((s) => s.autoReply).length,
     };
+  }
+
+  // ============================================================================
+  // CONVERSATION MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Check if a new conversation should be started
+   * @param channelId Channel ID
+   * @param peerId Peer ID
+   * @param timeWindowMs Time window in milliseconds (default: 30 minutes)
+   * @param maxMessages Maximum messages before reset (default: 20)
+   */
+  shouldStartNewConversation(
+    channelId: string,
+    peerId: string,
+    timeWindowMs: number = 30 * 60 * 1000,
+    maxMessages: number = 20
+  ): boolean {
+    const key = this.getPeerKey(channelId, peerId);
+    const conv = this.conversations.get(key);
+
+    if (!conv) {
+      return true;
+    }
+
+    const now = Date.now();
+    const timeExceeded = now - conv.lastMessageTime > timeWindowMs;
+    const messageCountExceeded = conv.messageCount >= maxMessages;
+
+    return timeExceeded || messageCountExceeded;
+  }
+
+  /**
+   * Start a new conversation (clears session messages but keeps session ID for memory)
+   */
+  startNewConversation(channelId: string, peerId: string, db: any): void {
+    const key = this.getPeerKey(channelId, peerId);
+    const session = this.peerSessions.get(key);
+
+    if (session?.sessionId) {
+      // Clear session messages in database
+      db.prepare('UPDATE sessions SET messages_json = ?, updated_at = ? WHERE id = ?').run(
+        '[]',
+        Date.now(),
+        session.sessionId
+      );
+
+      // Reset conversation state
+      this.conversations.set(key, {
+        channelId,
+        peerId,
+        sessionId: session.sessionId,
+        messageCount: 0,
+        lastMessageTime: Date.now(),
+        conversationStartTime: Date.now(),
+      });
+
+      console.log(`[ChannelRouter] Started new conversation for ${channelId}:${peerId}`);
+    }
+  }
+
+  /**
+   * Update conversation state after a message
+   */
+  updateConversation(channelId: string, peerId: string, messageContent: string): void {
+    const key = this.getPeerKey(channelId, peerId);
+    const session = this.peerSessions.get(key);
+
+    if (session?.sessionId) {
+      const existing = this.conversations.get(key);
+      const now = Date.now();
+
+      this.conversations.set(key, {
+        channelId,
+        peerId,
+        sessionId: session.sessionId,
+        messageCount: (existing?.messageCount || 0) + 1,
+        lastMessageTime: now,
+        conversationStartTime: existing?.conversationStartTime || now,
+      });
+    }
+  }
+
+  /**
+   * Get current conversation state
+   */
+  getConversation(channelId: string, peerId: string): ConversationState | undefined {
+    return this.conversations.get(this.getPeerKey(channelId, peerId));
+  }
+
+  /**
+   * Reset conversation for a peer (manual trigger)
+   */
+  resetConversation(channelId: string, peerId: string, db: any): void {
+    this.startNewConversation(channelId, peerId, db);
+  }
+
+  /**
+   * Clear conversation state for a peer
+   */
+  clearConversation(channelId: string, peerId: string): void {
+    const key = this.getPeerKey(channelId, peerId);
+    this.conversations.delete(key);
+  }
+
+  /**
+   * Clear all conversations for a channel
+   */
+  clearChannelConversations(channelId: string): void {
+    const keyPrefix = `${channelId}:`;
+    for (const key of this.conversations.keys()) {
+      if (key.startsWith(keyPrefix)) {
+        this.conversations.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Get all conversation states
+   */
+  getAllConversations(): ConversationState[] {
+    return Array.from(this.conversations.values());
   }
 }
 

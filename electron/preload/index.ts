@@ -347,6 +347,20 @@ const electronAPI = {
     test: (channelType: string, configJson: string) =>
       ipcRenderer.invoke('channels:test' as IPCChannel, channelType, configJson),
     accountInfo: (id: string) => ipcRenderer.invoke('channels:accountInfo' as IPCChannel, id),
+    // Conversation management
+    resetConversation: (channelId: string, peerId: string) =>
+      ipcRenderer.invoke('channels:resetConversation' as IPCChannel, channelId, peerId),
+    getConversation: (channelId: string, peerId: string) =>
+      ipcRenderer.invoke('channels:getConversation' as IPCChannel, channelId, peerId),
+    getAllConversations: () => ipcRenderer.invoke('channels:getAllConversations' as IPCChannel),
+    clearConversation: (channelId: string, peerId: string) =>
+      ipcRenderer.invoke('channels:clearConversation' as IPCChannel, channelId, peerId),
+    getConversationConfig: () => ipcRenderer.invoke('channels:getConversationConfig' as IPCChannel),
+    setConversationConfig: (config: {
+      timeWindowMs?: number;
+      maxMessages?: number;
+      enableAutoReset?: boolean;
+    }) => ipcRenderer.invoke('channels:setConversationConfig' as IPCChannel, config),
     onMessage: (
       callback: (message: {
         id: string;
@@ -484,6 +498,16 @@ const electronAPI = {
       ipcRenderer.on('evolution:content-delivery', listener);
       return () => ipcRenderer.removeListener('evolution:content-delivery', listener);
     },
+  },
+
+  // Token Counter
+  tokens: {
+    countText: (text: string, modelId?: string) =>
+      ipcRenderer.invoke('tokens:countText' as IPCChannel, text, modelId),
+    countMessage: (message: { role?: string; content?: string }, modelId?: string) =>
+      ipcRenderer.invoke('tokens:countMessage' as IPCChannel, message, modelId),
+    countMessages: (messages: Array<{ role?: string; content?: string }>, modelId?: string) =>
+      ipcRenderer.invoke('tokens:countMessages' as IPCChannel, messages, modelId),
   },
 };
 

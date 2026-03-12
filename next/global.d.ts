@@ -141,6 +141,43 @@ interface Window {
       cleanup: (maxAgeMs?: number) => Promise<any>;
       test: (channelType: string, configJson: string) => Promise<any>;
       accountInfo: (id: string) => Promise<any>;
+      // Conversation management
+      resetConversation: (channelId: string, peerId: string) => Promise<{ success: boolean }>;
+      getConversation: (
+        channelId: string,
+        peerId: string
+      ) => Promise<
+        | {
+            channelId: string;
+            peerId: string;
+            sessionId: string;
+            messageCount: number;
+            lastMessageTime: number;
+            conversationStartTime: number;
+          }
+        | undefined
+      >;
+      getAllConversations: () => Promise<
+        Array<{
+          channelId: string;
+          peerId: string;
+          sessionId: string;
+          messageCount: number;
+          lastMessageTime: number;
+          conversationStartTime: number;
+        }>
+      >;
+      clearConversation: (channelId: string, peerId: string) => Promise<{ success: boolean }>;
+      getConversationConfig: () => Promise<{
+        timeWindowMs: number;
+        maxMessages: number;
+        enableAutoReset: boolean;
+      }>;
+      setConversationConfig: (config: {
+        timeWindowMs?: number;
+        maxMessages?: number;
+        enableAutoReset?: boolean;
+      }) => Promise<{ success: boolean; config: any }>;
       onMessage: (callback: (message: any) => void) => () => void;
       onAutoReply: (callback: (data: any) => void) => () => void;
     };
@@ -194,6 +231,20 @@ interface Window {
       generatePredictions: () => Promise<void>;
       getLearningInsights: () => Promise<any>;
       onContentDelivery: (callback: (data: any) => void) => () => void;
+    };
+    tokens: {
+      countText: (
+        text: string,
+        modelId?: string
+      ) => Promise<{ success: boolean; count: number; error?: string }>;
+      countMessage: (
+        message: { role?: string; content?: string },
+        modelId?: string
+      ) => Promise<{ success: boolean; count: number; error?: string }>;
+      countMessages: (
+        messages: Array<{ role?: string; content?: string }>,
+        modelId?: string
+      ) => Promise<{ success: boolean; count: number; error?: string }>;
     };
   };
 }
