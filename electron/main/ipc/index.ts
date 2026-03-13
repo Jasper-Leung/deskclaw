@@ -21,6 +21,8 @@ import * as channelsHandlers from './channels.js';
 import * as browserHandlers from './browser.js';
 import * as extensionBridgeHandlers from './extension-bridge.js';
 import * as quickChatHandlers from './quick-chat.js';
+import * as tokensHandlers from './tokens.js';
+import * as communityKeysHandlers from './community-keys.js';
 import { registerGatewayIPCHandlers, setGatewayMainWindow } from './gateway.js';
 import { registerEvolutionHandlers } from './evolution.js';
 
@@ -411,7 +413,14 @@ export const registerIPCHandlers = (): void => {
   // Evolution
   registerEvolutionHandlers();
 
-  // Settings
+  // Tokens
+  tokensHandlers.registerTokensHandlers();
+
+  // Community Keys
+  communityKeysHandlers.registerCommunityKeysHandlers();
+
+  // Start heartbeat system for community keys
+  void import('./community-keys.js').then((m) => m.startHeartbeatSystem());
   ipcMain.handle('settings:get', (_, key) => getSetting(db, key));
   ipcMain.handle('settings:set', (_, key, value) => setSetting(db, key, value));
   ipcMain.handle('settings:getAll', () => getAllSettings(db));

@@ -509,6 +509,44 @@ const electronAPI = {
     countMessages: (messages: Array<{ role?: string; content?: string }>, modelId?: string) =>
       ipcRenderer.invoke('tokens:countMessages' as IPCChannel, messages, modelId),
   },
+
+  // Community Keys - Secure storage for community-specific API keys
+  communityKeys: {
+    list: () => ipcRenderer.invoke('communityKeys:list' as IPCChannel),
+    get: (id: string) => ipcRenderer.invoke('communityKeys:get' as IPCChannel, id),
+    getByCommunity: (communityId: string) =>
+      ipcRenderer.invoke('communityKeys:getByCommunity' as IPCChannel, communityId),
+    getActive: (communityId: string) =>
+      ipcRenderer.invoke('communityKeys:getActive' as IPCChannel, communityId),
+    add: (data: {
+      communityId: string;
+      communityName: string;
+      apiKey: string;
+      keyType?: 'api_key' | 'token' | 'oauth' | 'custom';
+      providerProtocol?: 'openai' | 'anthropic' | 'ollama' | 'custom';
+      baseUrl?: string;
+      heartbeatUrl?: string;
+      heartbeatInterval?: number;
+      expiresIn?: number;
+      metadata?: Record<string, unknown>;
+    }) => ipcRenderer.invoke('communityKeys:add' as IPCChannel, data),
+    update: (
+      id: string,
+      updates: {
+        apiKey?: string;
+        isActive?: boolean;
+        heartbeatUrl?: string;
+        heartbeatInterval?: number;
+        metadata?: Record<string, unknown>;
+      }
+    ) => ipcRenderer.invoke('communityKeys:update' as IPCChannel, id, updates),
+    delete: (id: string) => ipcRenderer.invoke('communityKeys:delete' as IPCChannel, id),
+    stats: () => ipcRenderer.invoke('communityKeys:stats' as IPCChannel),
+    test: (id: string) => ipcRenderer.invoke('communityKeys:test' as IPCChannel, id),
+    heartbeat: (id: string) => ipcRenderer.invoke('communityKeys:heartbeat' as IPCChannel, id),
+    useKey: (communityId: string, providerProtocol?: string) =>
+      ipcRenderer.invoke('communityKeys:useKey' as IPCChannel, communityId, providerProtocol),
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

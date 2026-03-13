@@ -246,5 +246,73 @@ interface Window {
         modelId?: string
       ) => Promise<{ success: boolean; count: number; error?: string }>;
     };
+    communityKeys: {
+      list: () => Promise<
+        Array<{
+          id: string;
+          communityId: string;
+          communityName: string;
+          keyType: 'api_key' | 'token' | 'oauth' | 'custom';
+          providerProtocol: 'openai' | 'anthropic' | 'ollama' | 'custom';
+          apiKeyEncrypted: string;
+          baseUrl?: string;
+          heartbeatUrl?: string;
+          lastHeartbeat?: number;
+          heartbeatInterval?: number;
+          metadata?: string;
+          isActive: boolean;
+          createdAt: number;
+          updatedAt: number;
+          expiresAt?: number;
+        }>
+      >;
+      get: (id: string) => Promise<any | undefined>;
+      getByCommunity: (communityId: string) => Promise<any[]>;
+      getActive: (communityId: string) => Promise<any | undefined>;
+      add: (data: {
+        communityId: string;
+        communityName: string;
+        apiKey: string;
+        keyType?: 'api_key' | 'token' | 'oauth' | 'custom';
+        providerProtocol?: 'openai' | 'anthropic' | 'ollama' | 'custom';
+        baseUrl?: string;
+        heartbeatUrl?: string;
+        heartbeatInterval?: number;
+        expiresIn?: number;
+        metadata?: Record<string, unknown>;
+      }) => Promise<{ success: boolean; key?: any; error?: string }>;
+      update: (
+        id: string,
+        updates: {
+          apiKey?: string;
+          isActive?: boolean;
+          heartbeatUrl?: string;
+          heartbeatInterval?: number;
+          metadata?: Record<string, unknown>;
+        }
+      ) => Promise<{ success: boolean; key?: any; error?: string }>;
+      delete: (id: string) => Promise<{ success: boolean; deleted: boolean; error?: string }>;
+      stats: () => Promise<{
+        totalKeys: number;
+        activeKeys: number;
+        expiredKeys: number;
+        keysByCommunity: Record<string, number>;
+      }>;
+      test: (
+        id: string
+      ) => Promise<{
+        success: boolean;
+        valid?: boolean;
+        keyType?: string;
+        providerProtocol?: string;
+        preview?: string;
+        error?: string;
+      }>;
+      heartbeat: (id: string) => Promise<{ success: boolean; error?: string; data?: any }>;
+      useKey: (
+        communityId: string,
+        providerProtocol?: string
+      ) => Promise<{ success: boolean; apiKey?: string; baseUrl?: string; error?: string }>;
+    };
   };
 }

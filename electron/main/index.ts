@@ -104,6 +104,8 @@ app.on('before-quit', () => {
   // Cleanup
   scheduledHandlers.stopAllScheduledTasks();
   closeDatabase();
+  // Stop heartbeat system
+  import('./ipc/community-keys.js').then((m) => m.stopHeartbeatSystem()).catch(() => {});
 });
 
 // IPC handlers for window control

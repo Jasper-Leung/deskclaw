@@ -14,15 +14,56 @@ export interface ShellOptions {
 }
 
 const DANGEROUS_PATTERNS = [
+  // Destructive commands
   /rm\s+-rf\s+\//,
   /rm\s+-rf\s+~/,
-
-  /:\(\)\{.*;\};:/,
   />\s*\/dev\/sda/,
   /mkfs\./,
   /dd\s+if=.*of=\/dev/,
   /chmod\s+777\s+\//,
   /chown\s+.*\s+\//,
+
+  // Fork bomb
+  /:\(\)\{.*;\};:/,
+
+  // Data exfiltration - reading sensitive files
+  /cat\s+.*\.encryption-key/,
+  /cat\s+.*\.secure-master-key/,
+  /cat\s+.*\.keychain-master-key/,
+  /cat\s+.*\/deskclaw\//,
+  /cat\s+.*AppData.*Roaming.*deskclaw/,
+
+  // Data exfiltration - network transmission
+  /curl\s+.*\|/,
+  /\|\s*curl/,
+  /wget\s+.*\|/,
+  /\|\s*wget/,
+  /nc\s+.*-l/,
+  /netcat\s+.*-l/,
+
+  // Data exfiltration - encoding for transmission
+  /base64\s+.*\.encryption-key/,
+  /base64\s+.*\.secure-master-key/,
+  /base64\s+.*\.keychain/,
+  /base64\s+.*\/deskclaw\//,
+
+  // Pipe to external commands (potential data exfiltration)
+  /\|\s*(curl|wget|nc|telnet|ncat)\s+/,
+
+  // Sensitive path access
+  /[/~].\.config.*deskclaw/,
+  /%APPDATA%.*deskclaw/i,
+  /\$HOME\/\.deskclaw/,
+
+  // Key file patterns
+  /\.encryption-key/,
+  /secure-master-key/,
+  /keychain-master-key/,
+  /community-keys\.json/,
+
+  // Config file access
+  /deskclaw\.db/,
+  /keychain-fallback\.json/,
 ];
 
 const isDangerousCommand = (command: string): boolean => {
