@@ -384,9 +384,17 @@ tools.file_list = {
       let filteredEntries = entries;
       if (pattern && pattern !== '*') {
         const { glob } = await import('glob');
-        const globPath = join(fullPath, pattern);
-        const matched = await glob(globPath);
-        const matchedNames = new Set(matched.map((f) => f.split('\\').pop()?.split('/').pop()));
+        // Normalize path separators for glob (use forward slashes)
+        const normalizedPath = fullPath.replace(/\\/g, '/');
+        const globPath = `${normalizedPath}/${pattern}`;
+        const matched = await glob(globPath, { windows: true });
+        const matchedNames = new Set(
+          matched.map((f) => {
+            // Extract filename from full path (handle both separators)
+            const parts = f.split(/[/\\]/);
+            return parts[parts.length - 1];
+          })
+        );
         filteredEntries = entries.filter((e) => matchedNames.has(e.name));
       }
 
@@ -2529,7 +2537,8 @@ tools.db_query = {
     },
     db_file: {
       type: 'string',
-      description: 'Optional path to external SQLite database file. If not provided, uses the application database.',
+      description:
+        'Optional path to external SQLite database file. If not provided, uses the application database.',
       required: false,
     },
     params: {
@@ -2754,7 +2763,8 @@ tools.csv_to_json = {
     },
     output_path: {
       type: 'string',
-      description: 'Optional output file path for the JSON result. If not provided, returns the JSON in the result.',
+      description:
+        'Optional output file path for the JSON result. If not provided, returns the JSON in the result.',
       required: false,
     },
     delimiter: {
@@ -2786,7 +2796,10 @@ tools.csv_to_json = {
       const content = await readFile(fullPath, 'utf-8');
 
       // Parse CSV
-      const lines = content.trim().split('\n').map((line) => line.trim());
+      const lines = content
+        .trim()
+        .split('\n')
+        .map((line) => line.trim());
 
       if (lines.length === 0) {
         return { result: null, error: 'CSV file is empty' };
@@ -2848,8 +2861,7 @@ tools.csv_to_json = {
  */
 tools.json_to_csv = {
   name: 'json_to_csv',
-  description:
-    'Convert JSON data to CSV format. Accepts JSON file path or direct JSON string.',
+  description: 'Convert JSON data to CSV format. Accepts JSON file path or direct JSON string.',
   parameters: {
     input: {
       type: 'string',
@@ -3018,8 +3030,7 @@ tools.hash_sha256 = {
  */
 tools.process_list = {
   name: 'process_list',
-  description:
-    'List running processes on the system. Useful for system monitoring and automation.',
+  description: 'List running processes on the system. Useful for system monitoring and automation.',
   parameters: {
     filter: {
       type: 'string',
@@ -3047,9 +3058,7 @@ tools.process_list = {
 
       // Apply filter if specified
       if (filter) {
-        processes = processes.filter((line) =>
-          line.toLowerCase().includes(filter.toLowerCase())
-        );
+        processes = processes.filter((line) => line.toLowerCase().includes(filter.toLowerCase()));
       }
 
       toolLogger.info(`[process_list] Listed ${processes.length} processes`);
@@ -3144,8 +3153,7 @@ tools.notification_show = {
  */
 tools.ping = {
   name: 'ping',
-  description:
-    'Ping a host to check network connectivity and measure latency.',
+  description: 'Ping a host to check network connectivity and measure latency.',
   parameters: {
     host: {
       type: 'string',

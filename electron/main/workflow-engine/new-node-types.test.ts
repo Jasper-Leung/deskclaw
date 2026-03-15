@@ -18,11 +18,22 @@ const mockDb = {
       return {
         get: vi.fn(() => ({
           definition_json: JSON.stringify({
-            nodes: [
-              { id: 'sub-node-1', type: 'trigger', position: { x: 100, y: 50 }, data: {} },
-            ],
+            nodes: [{ id: 'sub-node-1', type: 'trigger', position: { x: 100, y: 50 }, data: {} }],
             edges: [],
           }),
+        })),
+      };
+    }
+    if (query.includes('workflow_executions WHERE id = ?')) {
+      return {
+        get: vi.fn(() => ({
+          id: 'test-exec-id',
+          workflow_id: 'test-workflow-id',
+          workflow_version: 1,
+          status: 'completed',
+          started_at: Date.now(),
+          completed_at: Date.now(),
+          error_message: null,
         })),
       };
     }
@@ -56,6 +67,11 @@ vi.mock('../tools/index.js', () => ({
 // Mock logger
 vi.mock('../lib/logger.js', () => ({
   workflowLogger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  dbLogger: {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -95,9 +111,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const loopEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'loop-1' },
-      ];
+      const loopEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'loop-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -132,9 +146,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const loopEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'loop-1' },
-      ];
+      const loopEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'loop-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -170,9 +182,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const delayEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'delay-1' },
-      ];
+      const delayEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'delay-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -209,9 +219,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const varEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'var-1' },
-      ];
+      const varEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'var-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -247,9 +255,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const varEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'var-1' },
-      ];
+      const varEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'var-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -284,9 +290,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const varEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'var-1' },
-      ];
+      const varEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'var-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -380,9 +384,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const switchEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'switch-1' },
-      ];
+      const switchEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'switch-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -421,9 +423,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const switchEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'switch-1' },
-      ];
+      const switchEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'switch-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -460,9 +460,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const subWorkflowEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'sub-1' },
-      ];
+      const subWorkflowEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'sub-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -495,9 +493,7 @@ describe('New Workflow Node Types', () => {
         },
       ];
 
-      const subWorkflowEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'sub-1' },
-      ];
+      const subWorkflowEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'sub-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,

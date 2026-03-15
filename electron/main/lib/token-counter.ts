@@ -103,7 +103,9 @@ export function getUserConfigurableLimit(modelId: string = DEFAULT_MODEL): numbe
     // Try to get user override from database/settings
     const { getDatabase } = require('../db/index.js');
     const db = getDatabase();
-    const result = db.prepare('SELECT value FROM settings WHERE key = ?').get(`context_limit_${modelId}`);
+    const result = db
+      .prepare('SELECT value FROM settings WHERE key = ?')
+      .get(`context_limit_${modelId}`);
 
     if (result) {
       const limit = parseInt(result.value, 10);
@@ -283,7 +285,7 @@ export function countMessagesTokens(
  * @param text - The text to estimate tokens for
  * @returns The estimated number of tokens
  */
-export function estimateTokensFallback(text: string): number {
+export function estimateTokens(text: string): number {
   if (!text || text.length === 0) {
     return 0;
   }
@@ -295,6 +297,7 @@ export function estimateTokensFallback(text: string): number {
   // - JSON: can vary widely
 
   // Detect if text contains mostly non-ASCII characters (like Chinese)
+  // eslint-disable-next-line no-control-regex
   const nonAsciiRatio = (text.match(/[^\x00-\x7F]/g) || []).length / text.length;
 
   if (nonAsciiRatio > 0.5) {
@@ -335,4 +338,72 @@ export function cleanupEncodingCache(): void {
     encoding.free();
   }
   encodingCache.clear();
+}
+
+/**
+ * Get token limit for a model (alias for getModelContextLimit)
+ *
+ * @param modelId - The model ID
+ * @returns The maximum context window size in tokens
+ */
+export function getTokenLimit(modelId: string = DEFAULT_MODEL): number {
+  return getModelContextLimit(modelId);
+}
+
+/**
+ * Check if token count is near the model's context limit
+ *
+ * @param tokenCount - Current token count
+ * @param modelId - The model ID
+ * @param threshold - Threshold ratio (default 0.9)
+ * @returns True if near or over limit
+ */
+export function isNearTokenLimit(
+  tokenCount: number,
+  modelId: string = DEFAULT_MODEL,
+  threshold: number = 0.9
+): boolean {
+  const limit = getEffectiveContextLimit(modelId);
+  return tokenCount >= limit * threshold;
+}
+
+/**
+ * Truncate content to fit within token limit
+ *
+ * @param content - The content to truncate
+ * @param modelId - The model ID
+ * @param targetTokens - Target token count (default to 90% of context limit)
+ * @returns Truncated content with indicator if truncated
+ */
+export function truncateToTokenLimit(
+  content: string,
+  modelId: string = DEFAULT_MODEL,
+  targetTokens?: number
+): string {
+  if (!content || content.length === 0) {
+    return content;
+  }
+
+  const limit = getEffectiveContextLimit(modelId);
+  const target = targetTokens || Math.floor(limit * 0.9);
+
+  const currentTokens = countTokens(content, modelId);
+  if (currentTokens <= target) {
+    return content;
+  }
+
+  // Estimate truncation ratio
+  const ratio = target / currentTokens;
+  const targetLength = Math.floor(content.length * ratio);
+
+  // Truncate and add indicator
+  let truncated = content.substring(0, targetLength);
+
+  // Try to end at a word boundary
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > truncated.length - 50) {
+    truncated = truncated.substring(0, lastSpace);
+  }
+
+  return truncated + '...';
 }

@@ -2,10 +2,9 @@
  * Workflow Engine Tests
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Node, Edge } from '@xyflow/react';
 import Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
 
 // Mock the database module
 const mockDb = {
@@ -16,6 +15,7 @@ const mockDb = {
       name: 'gpt-4',
       model_id: 'gpt-4',
     })),
+    run: vi.fn(() => ({ lastInsertRowid: 1 })),
   })),
 };
 
@@ -45,6 +45,11 @@ vi.mock('../tools/index.js', () => ({
 // Mock logger
 vi.mock('../lib/logger.js', () => ({
   workflowLogger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  },
+  dbLogger: {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
@@ -101,9 +106,9 @@ describe('Workflow Engine', () => {
 
   describe('topologicalSort', () => {
     it('should sort nodes in execution order', async () => {
-      const { executeWorkflow } = await import('./index.js');
       // Import the internal function for testing
       // Since it's not exported, we'll test it through executeWorkflow
+      await import('./index.js');
       expect(testNodes.length).toBe(3);
       expect(testEdges.length).toBe(2);
     });
@@ -112,7 +117,6 @@ describe('Workflow Engine', () => {
       const nodesWithNoEdges: Node[] = [
         { id: 'node-1', type: 'trigger', position: { x: 100, y: 50 }, data: {} },
       ];
-      const edges: Edge[] = [];
       // Should still be able to process
       expect(nodesWithNoEdges.length).toBe(1);
     });
@@ -194,9 +198,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const promptEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'prompt-1' },
-      ];
+      const promptEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'prompt-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -231,9 +233,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const agentEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'agent-1' },
-      ];
+      const agentEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'agent-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -272,9 +272,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const toolEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'tool-1' },
-      ];
+      const toolEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'tool-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -307,9 +305,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const shellEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'shell-1' },
-      ];
+      const shellEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'shell-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -341,9 +337,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const conditionalEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'conditional-1' },
-      ];
+      const conditionalEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'conditional-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -372,9 +366,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const unknownEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'unknown-1' },
-      ];
+      const unknownEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'unknown-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
@@ -454,9 +446,7 @@ describe('Workflow Engine', () => {
         },
       ];
 
-      const agentEdges: Edge[] = [
-        { id: 'e1', source: 'trigger-1', target: 'agent-1' },
-      ];
+      const agentEdges: Edge[] = [{ id: 'e1', source: 'trigger-1', target: 'agent-1' }];
 
       const result = await executeWorkflow(
         mockDb as unknown as Database.Database,
