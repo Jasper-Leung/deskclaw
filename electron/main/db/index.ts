@@ -74,7 +74,7 @@ export const decrypt = (encrypted: string): string => {
     decrypted += decipher.final('utf8');
 
     return decrypted;
-  } catch (_error: unknown) {
+  } catch {
     throw new Error(
       'Failed to decrypt API key. This can happen if the app was recently updated. ' +
         'Please delete and re-add your provider to fix this issue.'

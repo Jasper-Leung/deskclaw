@@ -1,10 +1,9 @@
 'use client';
 
-import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertTriangle, Info, Maximize2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { AlertTriangle, Info } from 'lucide-react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 
 interface Message {
   role: string;
@@ -18,27 +17,55 @@ interface ContextUsageBarProps {
   maxChars?: number;
   onTruncate?: () => void;
   showWarning?: boolean;
+  modelId?: string; // Add modelId for accurate token counting
 }
 
 /**
- * Estimate token count for a message (rough approximation)
- * Uses ~4 characters per token estimate
+ * Fallback token estimation (character-based)
+ * Used when IPC is not available or fails
  */
-function estimateTokens(message: Message): number {
-  return Math.ceil(message.content.length / 4);
+function estimateTokensFallback(message: Message): number {
+  if (!message.content || message.content.length === 0) {
+    return 0;
+  }
+
+  // More accurate character-based estimation
+  // eslint-disable-next-line no-control-regex
+  const nonAsciiRatio =
+    (message.content.match(/[^\x00-\x7F]/g) || []).length / message.content.length;
+
+  if (nonAsciiRatio > 0.5) {
+    // Mostly CJK characters
+    return Math.ceil(message.content.length / 2);
+  } else if (message.content.includes('{') && message.content.includes('}')) {
+    // Likely JSON or code
+    return Math.ceil(message.content.length / 3);
+  } else {
+    // Standard English text
+    return Math.ceil(message.content.length / 4);
+  }
 }
 
 /**
  * Calculate total tokens/messages and provide usage statistics
+ * Uses accurate token counting via IPC when available
  */
 function calculateContextUsage(
   messages: Message[],
   maxTokens: number = 128000,
-  maxChars: number = 100000
+  maxChars: number = 100000,
+  accurateTokenCount: number | null = null
 ) {
   const totalMessages = messages.length;
   const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0);
-  const totalTokens = messages.reduce((sum, msg) => sum + estimateTokens(msg), 0);
+
+  // Use accurate token count if provided, otherwise use fallback
+  let totalTokens: number;
+  if (accurateTokenCount !== null) {
+    totalTokens = accurateTokenCount;
+  } else {
+    totalTokens = messages.reduce((sum, msg) => sum + estimateTokensFallback(msg), 0);
+  }
 
   // Use whichever limit is hit first
   const tokenPercentage = (totalTokens / maxTokens) * 100;
@@ -78,23 +105,46 @@ export function ContextUsageBar({
   maxChars = 100000,
   onTruncate,
   showWarning = true,
+  modelId = 'gpt-4', // Default model for token counting
 }: ContextUsageBarProps) {
-  const usage = useMemo(
-    () => calculateContextUsage(messages, maxTokens, maxChars),
-    [messages, maxTokens, maxChars]
-  );
+  // State for accurate token count
+  const [accurateTokenCount, setAccurateTokenCount] = useState<number | null>(null);
+  const [_isTokenLoading, setIsTokenLoading] = useState(false);
 
-  // Progress bar color based on status
-  const progressColor = useMemo(() => {
-    switch (usage.status) {
-      case 'danger':
-        return 'bg-red-500';
-      case 'warning':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-green-500';
+  // Function to get accurate token count via IPC
+  const getAccurateTokenCount = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.tokens) {
+      return;
     }
-  }, [usage.status]);
+
+    setIsTokenLoading(true);
+    try {
+      const result = await window.electronAPI.tokens.countMessages(messages, modelId);
+      if (result.success) {
+        setAccurateTokenCount(result.count);
+      }
+    } catch (error) {
+      console.warn('Failed to get accurate token count:', error);
+      // Will use fallback estimation
+    } finally {
+      setIsTokenLoading(false);
+    }
+  }, [messages, modelId]);
+
+  // Update accurate token count when messages or modelId changes
+  useEffect(() => {
+    // Debounce token counting to avoid excessive IPC calls
+    const timeoutId = setTimeout(() => {
+      getAccurateTokenCount();
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [getAccurateTokenCount]);
+
+  const usage = useMemo(
+    () => calculateContextUsage(messages, maxTokens, maxChars, accurateTokenCount),
+    [messages, maxTokens, maxChars, accurateTokenCount]
+  );
 
   // Warning message based on status
   const warningMessage = useMemo(() => {

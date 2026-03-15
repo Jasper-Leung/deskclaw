@@ -246,7 +246,7 @@ export function createDashboardSnapshot(db: Database, metrics: DashboardMetrics)
 export function getHistoricalSnapshots(
   db: Database,
   hours: number = 24,
-  intervalMinutes: number = 60
+  _intervalMinutes: number = 60
 ): DashboardMetrics[] {
   const now = Date.now();
   const since = now - hours * 60 * 60 * 1000;

@@ -289,7 +289,7 @@ export class ChannelRouter {
   /**
    * Update conversation state after a message
    */
-  updateConversation(channelId: string, peerId: string, messageContent: string): void {
+  updateConversation(channelId: string, peerId: string, _messageContent: string): void {
     const key = this.getPeerKey(channelId, peerId);
     const session = this.peerSessions.get(key);
 

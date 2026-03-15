@@ -4,6 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { streamText, generateText } from 'ai';
 import { decrypt } from '../db/index.js';
 import type { LLMRequest } from '../../../shared/types/index.js';
+import { getModelContextLimit, countMessagesTokens } from '../lib/token-counter.js';
 
 interface Message {
   role: 'system' | 'user' | 'assistant' | 'tool' | 'tool_result' | 'tool_error';
@@ -143,11 +144,25 @@ export const chat = async (
         return { role: 'assistant' as const, content: m.content };
       });
 
+    // Calculate available tokens for output
+    // Reserve space for: input messages + response format overhead
+    const modelContextLimit = getModelContextLimit(providerConfig.modelId);
+    const inputTokens = countMessagesTokens(filteredMessages, providerConfig.modelId);
+    const reservedTokens = 1000; // Reserve for response overhead
+    const availableOutputTokens = modelContextLimit - inputTokens - reservedTokens;
+
+    // Ensure we don't exceed requested maxTokens or available tokens
+    const requestedMaxTokens = request.maxTokens ?? 16384;
+    const actualMaxTokens = Math.max(
+      256, // Minimum tokens to ensure meaningful response
+      Math.min(requestedMaxTokens, availableOutputTokens)
+    );
+
     const result = await generateText({
       model: client(providerConfig.modelId),
       messages: filteredMessages,
       temperature: request.temperature ?? 0.7,
-      maxTokens: request.maxTokens ?? 16384,
+      maxTokens: actualMaxTokens,
     });
 
     return {
@@ -193,11 +208,23 @@ export const chatStream = async (
         return { role: 'assistant' as const, content: m.content };
       });
 
+    // Calculate available tokens for output
+    const modelContextLimit = getModelContextLimit(providerConfig.modelId);
+    const inputTokens = countMessagesTokens(filteredMessages, providerConfig.modelId);
+    const reservedTokens = 1000; // Reserve for response overhead
+    const availableOutputTokens = modelContextLimit - inputTokens - reservedTokens;
+
+    const requestedMaxTokens = request.maxTokens ?? 16384;
+    const actualMaxTokens = Math.max(
+      256, // Minimum tokens to ensure meaningful response
+      Math.min(requestedMaxTokens, availableOutputTokens)
+    );
+
     const result = await streamText({
       model: client(providerConfig.modelId),
       messages: filteredMessages,
       temperature: request.temperature ?? 0.7,
-      maxTokens: request.maxTokens ?? 16384,
+      maxTokens: actualMaxTokens,
     });
 
     for await (const chunk of result.textStream) {

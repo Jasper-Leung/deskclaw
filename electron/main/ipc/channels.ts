@@ -182,7 +182,7 @@ async function handleIncomingMessage(
           model: modelToUse,
           messages,
           temperature: sessionConfig.temperature ?? 0.7,
-          maxTokens: 4096,
+          maxTokens: 4096, // Will be adjusted based on available context
         },
         {
           agentId: sessionConfig.agentId,

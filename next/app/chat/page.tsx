@@ -195,6 +195,7 @@ export default function ChatPage() {
     setupStreamListeners();
     setupWorkflowListeners();
     setupScheduledListeners();
+    setupChannelsListeners();
 
     // Track page view
     window.electronAPI?.evolution?.trackEvent?.('page_view', { page: 'chat' });
@@ -217,6 +218,9 @@ export default function ChatPage() {
       }
       if (scheduledCleanupRef.current) {
         scheduledCleanupRef.current();
+      }
+      if (channelsCleanupRef.current) {
+        channelsCleanupRef.current();
       }
     };
   }, []);
@@ -991,6 +995,27 @@ export default function ChatPage() {
                     console.log('No "tool" key found in response');
                   }
 
+                  // Check if we need to send the response to a channel
+                  const channelInfoStr = sessionStorage.getItem('currentChannelInfo');
+                  if (channelInfoStr && window.electronAPI?.channels) {
+                    try {
+                      const channelInfo = JSON.parse(channelInfoStr);
+                      // Send the assistant's response to the channel
+                      window.electronAPI.channels
+                        .send(channelInfo.channelId, channelInfo.peerId, prev)
+                        .then(() => {
+                          console.log('Response sent to channel:', channelInfo);
+                        })
+                        .catch((error) => {
+                          console.error('Failed to send response to channel:', error);
+                        });
+                      // Clear the channel info after sending
+                      sessionStorage.removeItem('currentChannelInfo');
+                    } catch (error) {
+                      console.error('Failed to parse channel info:', error);
+                    }
+                  }
+
                   processingDoneRef.current = false;
                   return newMsgs;
                 });
@@ -1125,6 +1150,58 @@ export default function ChatPage() {
 
       scheduledCleanupRef.current = () => {
         unsubMessage();
+      };
+    }
+  };
+
+  const channelsCleanupRef = useRef<(() => void) | null>(null);
+
+  const setupChannelsListeners = () => {
+    if (window.electronAPI && window.electronAPI.channels) {
+      const unsubAutoReply = window.electronAPI.channels.onAutoReply(
+        async (data: { sessionId: string; channelId: string; peerId: string }) => {
+          console.log('Received channel auto-reply request:', data);
+
+          try {
+            // Load the session associated with this channel/peer
+            const session = await window.electronAPI.sessions.get(data.sessionId);
+            if (session) {
+              // Switch to this session
+              setCurrentSessionId(data.sessionId);
+              setMessages(session.messages || []);
+
+              // Get the last message (should be the user's message from the channel)
+              const lastMessage = session.messages?.[session.messages.length - 1];
+              if (lastMessage && lastMessage.role === 'user') {
+                // Trigger AI response
+                // Store channel info for sending the response back
+                sessionStorage.setItem(
+                  'currentChannelInfo',
+                  JSON.stringify({
+                    channelId: data.channelId,
+                    peerId: data.peerId,
+                  })
+                );
+
+                // Trigger the normal chat flow
+                const userMessageObj: Message = {
+                  role: 'user',
+                  content: lastMessage.content,
+                  timestamp: Date.now(),
+                };
+
+                // Use the existing chat flow
+                proceedWithNormalChat(lastMessage.content, userMessageObj, session.messages || []);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to handle channel auto-reply:', error);
+          }
+        }
+      );
+
+      channelsCleanupRef.current = () => {
+        unsubAutoReply();
       };
     }
   };

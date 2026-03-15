@@ -4,7 +4,7 @@
  * Provides centralized error handling for the Electron main process.
  */
 
-import { app, dialog } from 'electron';
+import { app, dialog, clipboard } from 'electron';
 import { dbLogger, ipcLogger, workflowLogger, toolLogger, memoryLogger } from './logger.js';
 import type { AppError } from '../../../shared/types/common.js';
 
@@ -154,7 +154,7 @@ function showErrorDialog(error: ApplicationError): void {
       .then((result) => {
         if (result.response === 1) {
           // Copy error to clipboard
-          require('electron').clipboard.writeText(
+          clipboard.writeText(
             `Error Code: ${error.code}\nCategory: ${error.category}\nMessage: ${error.message}\nStack: ${error.stack}`
           );
         }

@@ -16,6 +16,7 @@ import {
   getWorkflowExplanationPrompt,
 } from '../prompts/workflow-generation.js';
 import { workflowLogger } from '../lib/logger.js';
+import { getModelContextLimit, countTokens } from '../lib/token-counter.js';
 
 interface ProviderConfig {
   protocol: 'openai' | 'anthropic' | 'ollama' | 'custom';
@@ -277,6 +278,12 @@ export async function generateWorkflow(
     const prompt = getWorkflowGenerationPrompt(description, availableTools);
 
     // Call LLM
+    const modelContextLimit = getModelContextLimit(providerConfig.modelId);
+    const promptTokens = countTokens(prompt, providerConfig.modelId);
+    const reservedTokens = 1000; // Reserve for response format overhead
+    const availableOutputTokens = modelContextLimit - promptTokens - reservedTokens;
+    const requestedMaxTokens = 4000;
+
     const result = await generateText({
       model: client(providerConfig.modelId),
       messages: [
@@ -286,7 +293,7 @@ export async function generateWorkflow(
         },
       ],
       temperature: 0.7,
-      maxTokens: 4000,
+      maxTokens: Math.max(256, Math.min(requestedMaxTokens, availableOutputTokens)),
     });
 
     // Parse response
@@ -369,6 +376,12 @@ export async function refineWorkflow(
     const prompt = getWorkflowRefinementPrompt(JSON.stringify(currentWorkflow, null, 2), feedback);
 
     // Call LLM
+    const modelContextLimit = getModelContextLimit(providerConfig.modelId);
+    const promptTokens = countTokens(prompt, providerConfig.modelId);
+    const reservedTokens = 1000;
+    const availableOutputTokens = modelContextLimit - promptTokens - reservedTokens;
+    const requestedMaxTokens = 4000;
+
     const result = await generateText({
       model: client(providerConfig.modelId),
       messages: [
@@ -378,7 +391,7 @@ export async function refineWorkflow(
         },
       ],
       temperature: 0.7,
-      maxTokens: 4000,
+      maxTokens: Math.max(256, Math.min(requestedMaxTokens, availableOutputTokens)),
     });
 
     // Parse response
@@ -451,6 +464,12 @@ export async function explainWorkflow(
     const prompt = getWorkflowExplanationPrompt(JSON.stringify(workflow, null, 2));
 
     // Call LLM
+    const modelContextLimit = getModelContextLimit(providerConfig.modelId);
+    const promptTokens = countTokens(prompt, providerConfig.modelId);
+    const reservedTokens = 500; // Less overhead for explanations
+    const availableOutputTokens = modelContextLimit - promptTokens - reservedTokens;
+    const requestedMaxTokens = 2000;
+
     const result = await generateText({
       model: client(providerConfig.modelId),
       messages: [
@@ -460,7 +479,7 @@ export async function explainWorkflow(
         },
       ],
       temperature: 0.5,
-      maxTokens: 2000,
+      maxTokens: Math.max(256, Math.min(requestedMaxTokens, availableOutputTokens)),
     });
 
     workflowLogger.info(
