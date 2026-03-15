@@ -30,9 +30,9 @@ function estimateTokensFallback(message: Message): number {
   }
 
   // More accurate character-based estimation
-  // eslint-disable-next-line no-control-regex
-  const nonAsciiRatio =
-    (message.content.match(/[^\x00-\x7F]/g) || []).length / message.content.length;
+  // Use a different approach to avoid control character in regex
+  const nonAsciiCount = message.content.split('').filter((c) => c.charCodeAt(0) > 127).length;
+  const nonAsciiRatio = nonAsciiCount / message.content.length;
 
   if (nonAsciiRatio > 0.5) {
     // Mostly CJK characters
