@@ -203,7 +203,7 @@ describe('Tools System', () => {
       const result = await executeTool('file_read', { filepath: testFile });
       expect(result.error).toBeUndefined();
       expect(result.result).toBeDefined();
-      expect(result.result.content).toContain('Hello, World!');
+      expect((result.result as { content: string }).content).toContain('Hello, World!');
     });
 
     it('should return error for non-existent file', async () => {
@@ -220,7 +220,9 @@ describe('Tools System', () => {
       await fs.writeFile(testFile, largeContent);
       const result = await executeTool('file_read', { filepath: testFile });
       expect(result.error).toBeUndefined();
-      expect(result.result.content.length).toBeLessThan(largeContent.length);
+      expect((result.result as { content: string }).content.length).toBeLessThan(
+        largeContent.length
+      );
     });
   });
 
@@ -233,7 +235,7 @@ describe('Tools System', () => {
         content: 'Test content',
       });
       expect(result.error).toBeUndefined();
-      expect(result.result.success).toBe(true);
+      expect((result.result as { success: boolean }).success).toBe(true);
 
       // Verify file was written
       const content = await fs.readFile(testFile, 'utf-8');
@@ -264,8 +266,8 @@ describe('Tools System', () => {
 
       const result = await executeTool('file_list', { path: testDir });
       expect(result.error).toBeUndefined();
-      expect(result.result.exists).toBe(true);
-      expect(result.result.total).toBeGreaterThan(0);
+      expect((result.result as { exists: boolean }).exists).toBe(true);
+      expect((result.result as { total: number }).total).toBeGreaterThan(0);
     });
 
     it('should filter files by pattern', async () => {
@@ -276,14 +278,15 @@ describe('Tools System', () => {
 
       const result = await executeTool('file_list', { path: testDir, pattern: '*.txt' });
       expect(result.error).toBeUndefined();
-      const txtFiles = result.result.entries.filter((e: any) => e.name.endsWith('.txt'));
+      const entries = (result.result as { entries: Array<{ name: string }> }).entries;
+      const txtFiles = entries.filter((e) => e.name.endsWith('.txt'));
       expect(txtFiles.length).toBe(2);
     });
 
     it('should handle non-existent directory gracefully', async () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('file_list', { path: '/non/existent/path' });
-      expect(result.result.exists).toBe(false);
+      expect((result.result as { exists: boolean }).exists).toBe(false);
     });
   });
 
@@ -292,16 +295,16 @@ describe('Tools System', () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('get_time', {});
       expect(result.error).toBeUndefined();
-      expect(result.result.current_time).toBeDefined();
-      expect(result.result.iso).toBeDefined();
-      expect(result.result.unix).toBeDefined();
+      expect((result.result as { current_time: string }).current_time).toBeDefined();
+      expect((result.result as { iso: string }).iso).toBeDefined();
+      expect((result.result as { unix: number }).unix).toBeDefined();
     });
 
     it('should return time in specified timezone', async () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('get_time', { timezone: 'UTC' });
       expect(result.error).toBeUndefined();
-      expect(result.result.timezone).toBe('UTC');
+      expect((result.result as { timezone: string }).timezone).toBe('UTC');
     });
   });
 
@@ -344,8 +347,8 @@ describe('Tools System', () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('scheduled_list', {});
       expect(result.error).toBeUndefined();
-      expect(result.result.tasks).toBeDefined();
-      expect(Array.isArray(result.result.tasks)).toBe(true);
+      expect((result.result as { tasks: unknown }).tasks).toBeDefined();
+      expect(Array.isArray((result.result as { tasks: unknown }).tasks)).toBe(true);
     });
 
     it('should create scheduled task', async () => {
@@ -358,7 +361,7 @@ describe('Tools System', () => {
         enabled: false,
       });
       expect(result.error).toBeUndefined();
-      expect(result.result.id).toBeDefined();
+      expect((result.result as { id: string }).id).toBeDefined();
     });
 
     it('should validate task type', async () => {
@@ -378,8 +381,8 @@ describe('Tools System', () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('workflow_list', {});
       expect(result.error).toBeUndefined();
-      expect(result.result.workflows).toBeDefined();
-      expect(Array.isArray(result.result.workflows)).toBe(true);
+      expect((result.result as { workflows: unknown }).workflows).toBeDefined();
+      expect(Array.isArray((result.result as { workflows: unknown }).workflows)).toBe(true);
     });
   });
 
@@ -392,7 +395,7 @@ describe('Tools System', () => {
         message: 'Test message',
       });
       expect(result.error).toBeUndefined();
-      expect(result.result.messageId).toBeDefined();
+      expect((result.result as { messageId: string }).messageId).toBeDefined();
     });
   });
 
@@ -432,15 +435,15 @@ describe('Tools System', () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('list_skills', {});
       expect(result.error).toBeUndefined();
-      expect(result.result.skills).toBeDefined();
-      expect(Array.isArray(result.result.skills)).toBe(true);
+      expect((result.result as { skills: unknown }).skills).toBeDefined();
+      expect(Array.isArray((result.result as { skills: unknown }).skills)).toBe(true);
     });
 
     it('should filter skills by domain', async () => {
       const { executeTool } = await import('./index.js');
       const result = await executeTool('list_skills', { domain: 'document' });
       expect(result.error).toBeUndefined();
-      expect(result.result.domain).toBe('document');
+      expect((result.result as { domain: string }).domain).toBe('document');
     });
   });
 });

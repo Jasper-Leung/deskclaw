@@ -353,7 +353,7 @@ async function executeNode(
       }
 
       case 'loop': {
-        const loopType = data.loopType as string || 'count';
+        const loopType = (data.loopType as string) || 'count';
         const maxIterations = (data.maxIterations as number) || 10;
         const loopCondition = data.loopCondition as string | undefined;
 
@@ -365,7 +365,8 @@ async function executeNode(
         if (loopType === 'count') {
           shouldContinue = loopCount < maxIterations;
         } else if (loopType === 'conditional' && loopCondition) {
-          shouldContinue = evaluateCondition(loopCondition, context.results) && loopCount < maxIterations;
+          shouldContinue =
+            evaluateCondition(loopCondition, context.results) && loopCount < maxIterations;
         }
 
         if (!shouldContinue) {
@@ -477,8 +478,8 @@ async function executeNode(
       }
 
       case 'merge': {
-        const mergeType = data.mergeType as string || 'all';
-        const sourceNodeIds = data.sourceNodeIds as string[] || [];
+        const mergeType = (data.mergeType as string) || 'all';
+        const sourceNodeIds = (data.sourceNodeIds as string[]) || [];
 
         const mergedResults: Record<string, unknown> = {};
 
@@ -556,7 +557,11 @@ async function executeNode(
         const passParameters = data.parameters as Record<string, unknown> | undefined;
 
         if (!subWorkflowId && !subWorkflowName) {
-          return { success: false, result: null, error: 'Sub-workflow node missing workflowId or workflowName' };
+          return {
+            success: false,
+            result: null,
+            error: 'Sub-workflow node missing workflowId or workflowName',
+          };
         }
 
         // Get the sub-workflow definition
@@ -566,19 +571,31 @@ async function executeNode(
           const workflowRow = context.db
             .prepare('SELECT id FROM workflows WHERE name = ?')
             .get(subWorkflowName) as { id: string } | undefined;
-          if (!workflowRow) {
-            return { success: false, result: null, error: `Sub-workflow not found: ${subWorkflowName}` };
+          if (!workflowRow || !workflowRow.id) {
+            return {
+              success: false,
+              result: null,
+              error: `Sub-workflow not found: ${subWorkflowName}`,
+            };
           }
           targetWorkflowId = workflowRow.id;
         }
 
         // Get workflow definition from database
+        if (!targetWorkflowId) {
+          return { success: false, result: null, error: 'Sub-workflow ID not found' };
+        }
+
         const workflowDef = context.db
           .prepare('SELECT definition_json FROM workflows WHERE id = ?')
           .get(targetWorkflowId) as { definition_json: string } | undefined;
 
         if (!workflowDef) {
-          return { success: false, result: null, error: `Sub-workflow definition not found: ${targetWorkflowId}` };
+          return {
+            success: false,
+            result: null,
+            error: `Sub-workflow definition not found: ${targetWorkflowId}`,
+          };
         }
 
         const workflowDefinition = JSON.parse(workflowDef.definition_json);
@@ -682,7 +699,11 @@ function estimateTotalTokens(messages: Message[], modelId: string = 'gpt-4'): nu
  * Compress message history when approaching context limit
  * Smart compression that preserves important context while reducing token usage
  */
-function compressMessageHistory(messages: Message[], maxTokens: number = 100000, modelId: string = 'gpt-4'): Message[] {
+function compressMessageHistory(
+  messages: Message[],
+  maxTokens: number = 100000,
+  modelId: string = 'gpt-4'
+): Message[] {
   // Calculate total tokens
   let totalTokens = estimateTotalTokens(messages, modelId);
 
@@ -816,181 +837,202 @@ export async function executeWorkflow(
 
   const startTime = Date.now();
 
+  // Build context outside try block for error handling
+  const sortedNodes = topologicalSort(workflowNodes, workflowEdges);
+  const nodeMap = new Map(sortedNodes.map((node) => [node.id, node]));
+  const context: ExecutionContext = {
+    nodes: nodeMap,
+    edges: workflowEdges,
+    results: new Map(),
+    db,
+    messageHistory: [],
+  };
+
   try {
-    // Sort nodes in execution order
-    const sortedNodes = topologicalSort(workflowNodes, workflowEdges);
+    // Execute nodes sequentially
+    for (const node of sortedNodes) {
+      const nodeName = String(node.data?.label || node.id);
+      onProgress?.({ type: 'node_start', nodeId: node.id, nodeName });
 
-    // Build context
-    const nodeMap = new Map(sortedNodes.map((node) => [node.id, node]));
-    const context: ExecutionContext = {
-      nodes: nodeMap,
-      edges: workflowEdges,
-      results: new Map(),
-      db,
-      messageHistory: [],
-    };
+      const { success, result, error } = await executeNode(node, context);
+      context.results.set(node.id, { success, result, error });
 
-  // Execute nodes sequentially
-  for (const node of sortedNodes) {
-    const nodeName = String(node.data?.label || node.id);
-    onProgress?.({ type: 'node_start', nodeId: node.id, nodeName });
+      if (success) {
+        onProgress?.({ type: 'node_complete', nodeId: node.id, nodeName, data: result });
+      } else {
+        onProgress?.({ type: 'node_error', nodeId: node.id, nodeName, error });
+      }
 
-    const { success, result, error } = await executeNode(node, context);
-    context.results.set(node.id, { success, result, error });
+      // Handle conditional branching
+      if (node.type === 'conditional') {
+        const conditionalResult = result as { type: string; value: boolean };
+        const shouldContinue = conditionalResult.value;
 
-    if (success) {
-      onProgress?.({ type: 'node_complete', nodeId: node.id, nodeName, data: result });
-    } else {
-      onProgress?.({ type: 'node_error', nodeId: node.id, nodeName, error });
-    }
+        // Find outgoing edges and filter by sourceHandle
+        const outgoingEdges = workflowEdges.filter((e) => e.source === node.id);
+        const nextHandle = shouldContinue ? 'true' : 'false';
 
-    // Handle conditional branching
-    if (node.type === 'conditional') {
-      const conditionalResult = result as { type: string; value: boolean };
-      const shouldContinue = conditionalResult.value;
-
-      // Find outgoing edges and filter by sourceHandle
-      const outgoingEdges = workflowEdges.filter((e) => e.source === node.id);
-      const nextHandle = shouldContinue ? 'true' : 'false';
-
-      // Remove nodes that shouldn't be executed based on condition
-      for (const edge of outgoingEdges) {
-        if (edge.sourceHandle && edge.sourceHandle !== nextHandle) {
-          // Mark the target node as skipped (won't be executed)
-          const targetNode = context.nodes.get(edge.target!);
-          if (targetNode) {
-            context.results.set(edge.target!, { success: true, result: null, skipped: true });
+        // Remove nodes that shouldn't be executed based on condition
+        for (const edge of outgoingEdges) {
+          if (edge.sourceHandle && edge.sourceHandle !== nextHandle) {
+            // Mark the target node as skipped (won't be executed)
+            const targetNode = context.nodes.get(edge.target!);
+            if (targetNode) {
+              context.results.set(edge.target!, { success: true, result: null, skipped: true });
+            }
           }
         }
       }
-    }
 
-    // Handle loop nodes
-    if (node.type === 'loop') {
-      const loopResult = result as { type: string; completed: boolean; _continueLoop?: boolean; iterations?: number };
+      // Handle loop nodes
+      if (node.type === 'loop') {
+        const loopResult = result as {
+          type: string;
+          completed: boolean;
+          _continueLoop?: boolean;
+          iterations?: number;
+        };
 
-      if (!loopResult.completed && loopResult._continueLoop) {
-        // Find loop body nodes (nodes connected to the loop's output)
-        const loopBodyEdges = workflowEdges.filter((e) => e.source === node.id);
-        const loopBodyNodeIds = loopBodyEdges.map((e) => e.target).filter(Boolean);
+        if (!loopResult.completed && loopResult._continueLoop) {
+          // Find loop body nodes (nodes connected to the loop's output)
+          const loopBodyEdges = workflowEdges.filter((e) => e.source === node.id);
+          const loopBodyNodeIds = loopBodyEdges.map((e) => e.target).filter(Boolean);
 
-        // Find the node that should loop back (look for edge pointing back to loop or to node after loop body)
-        const loopBackEdge = workflowEdges.find((e) =>
-          loopBodyNodeIds.includes(e.target) && loopBodyNodeIds.includes(e.source)
-        );
+          // Find the node that should loop back (look for edge pointing back to loop or to node after loop body)
+          const loopBackEdge = workflowEdges.find(
+            (e) => loopBodyNodeIds.includes(e.target) && loopBodyNodeIds.includes(e.source)
+          );
 
-        // Update the loop node's data with the new iteration count
-        node.data = { ...node.data, _loopCount: loopResult.iterations };
+          // Update the loop node's data with the new iteration count
+          node.data = { ...node.data, _loopCount: loopResult.iterations };
 
-        // Re-execute the loop body nodes for the next iteration
-        if (loopBackEdge && loopBodyNodeIds.length > 0) {
-          // Get the node to restart the loop from (first node in loop body)
-          const loopStartNodeId = loopBodyNodeIds[0];
+          // Re-execute the loop body nodes for the next iteration
+          if (loopBackEdge && loopBodyNodeIds.length > 0) {
+            // Get the node to restart the loop from (first node in loop body)
+            const loopStartNodeId = loopBodyNodeIds[0];
 
-          // Find position of loop start node in sorted nodes
-          const loopStartIndex = sortedNodes.findIndex((n) => n.id === loopStartNodeId);
+            // Find position of loop start node in sorted nodes
+            const loopStartIndex = sortedNodes.findIndex((n) => n.id === loopStartNodeId);
 
-          if (loopStartIndex !== -1) {
-            // Continue execution from the loop start node
-            for (let i = loopStartIndex; i < sortedNodes.length; i++) {
-              const loopNode = sortedNodes[i];
-              // Skip nodes that are not part of the loop body
-              if (!loopBodyNodeIds.includes(loopNode.id)) {
-                break;
-              }
+            if (loopStartIndex !== -1) {
+              // Continue execution from the loop start node
+              for (let i = loopStartIndex; i < sortedNodes.length; i++) {
+                const loopNode = sortedNodes[i];
+                // Skip nodes that are not part of the loop body
+                if (!loopBodyNodeIds.includes(loopNode.id)) {
+                  break;
+                }
 
-              const loopNodeName = String(loopNode.data?.label || loopNode.id);
-              onProgress?.({ type: 'node_start', nodeId: loopNode.id, nodeName: loopNodeName });
+                const loopNodeName = String(loopNode.data?.label || loopNode.id);
+                onProgress?.({ type: 'node_start', nodeId: loopNode.id, nodeName: loopNodeName });
 
-              const { success: lSuccess, result: lResult, error: lError } = await executeNode(loopNode, context);
-              context.results.set(loopNode.id, { success: lSuccess, result: lResult, error: lError });
+                const {
+                  success: lSuccess,
+                  result: lResult,
+                  error: lError,
+                } = await executeNode(loopNode, context);
+                context.results.set(loopNode.id, {
+                  success: lSuccess,
+                  result: lResult,
+                  error: lError,
+                });
 
-              if (lSuccess) {
-                onProgress?.({ type: 'node_complete', nodeId: loopNode.id, nodeName: loopNodeName, data: lResult });
-              } else {
-                onProgress?.({ type: 'node_error', nodeId: loopNode.id, nodeName: loopNodeName, error: lError });
-              }
+                if (lSuccess) {
+                  onProgress?.({
+                    type: 'node_complete',
+                    nodeId: loopNode.id,
+                    nodeName: loopNodeName,
+                    data: lResult,
+                  });
+                } else {
+                  onProgress?.({
+                    type: 'node_error',
+                    nodeId: loopNode.id,
+                    nodeName: loopNodeName,
+                    error: lError,
+                  });
+                }
 
-              // Stop loop on failure
-              if (!lSuccess) {
-                break;
+                // Stop loop on failure
+                if (!lSuccess) {
+                  break;
+                }
               }
             }
           }
         }
       }
-    }
 
-    // Handle switch nodes (multi-way branching)
-    if (node.type === 'switch') {
-      const switchResult = result as { type: string; matchedValue: string | null };
+      // Handle switch nodes (multi-way branching)
+      if (node.type === 'switch') {
+        const switchResult = result as { type: string; matchedValue: string | null };
 
-      // Find outgoing edges and filter by matched value
-      const outgoingEdges = workflowEdges.filter((e) => e.source === node.id);
-      const matchedValue = switchResult.matchedValue;
+        // Find outgoing edges and filter by matched value
+        const outgoingEdges = workflowEdges.filter((e) => e.source === node.id);
+        const matchedValue = switchResult.matchedValue;
 
-      // Remove nodes that don't match the switch case
-      for (const edge of outgoingEdges) {
-        if (edge.sourceHandle && edge.sourceHandle !== String(matchedValue)) {
-          const targetNode = context.nodes.get(edge.target!);
-          if (targetNode) {
-            context.results.set(edge.target!, { success: true, result: null, skipped: true });
+        // Remove nodes that don't match the switch case
+        for (const edge of outgoingEdges) {
+          if (edge.sourceHandle && edge.sourceHandle !== String(matchedValue)) {
+            const targetNode = context.nodes.get(edge.target!);
+            if (targetNode) {
+              context.results.set(edge.target!, { success: true, result: null, skipped: true });
+            }
           }
         }
       }
-    }
 
-    // Stop execution on critical failure
-    if (!success && !['conditional', 'loop', 'switch'].includes(node.type)) {
-      const durationMs = Date.now() - startTime;
-      const finalResult = {
-        success: false,
-        workflowId,
-        executionId,
-        status: 'failed' as const,
-        results: Object.fromEntries(context.results),
-        error: `Node ${node.id} failed: ${error}`,
-      };
+      // Stop execution on critical failure
+      if (!success && node.type && !['conditional', 'loop', 'switch'].includes(node.type)) {
+        const durationMs = Date.now() - startTime;
+        const finalResult = {
+          success: false,
+          workflowId,
+          executionId,
+          status: 'failed' as const,
+          results: Object.fromEntries(context.results),
+          error: `Node ${node.id} failed: ${error}`,
+        };
 
-      // Update execution record
-      if (executionRecord) {
-        updateWorkflowExecution(db, executionRecord.id, {
-          status: 'failed',
-          completedAt: Date.now(),
-          durationMs,
-          error: finalResult.error,
-          nodeResults: JSON.stringify(finalResult.results),
-        });
+        // Update execution record
+        if (executionRecord) {
+          updateWorkflowExecution(db, executionRecord.id, {
+            status: 'failed',
+            completedAt: Date.now(),
+            durationMs,
+            error: finalResult.error,
+            nodeResults: JSON.stringify(finalResult.results),
+          });
+        }
+
+        onProgress?.({ type: 'complete', data: finalResult });
+        return finalResult;
       }
-
-      onProgress?.({ type: 'complete', data: finalResult });
-      return finalResult;
     }
-  }
 
-  // Calculate final result
-  const durationMs = Date.now() - startTime;
-  const finalResult = {
-    success: true,
-    workflowId,
-    executionId,
-    status: 'completed' as const,
-    results: Object.fromEntries(context.results),
-  };
+    // Calculate final result
+    const durationMs = Date.now() - startTime;
+    const finalResult = {
+      success: true,
+      workflowId,
+      executionId,
+      status: 'completed' as const,
+      results: Object.fromEntries(context.results),
+    };
 
-  // Update execution record
-  if (executionRecord) {
-    updateWorkflowExecution(db, executionRecord.id, {
-      status: 'completed',
-      completedAt: Date.now(),
-      durationMs,
-      outputData: JSON.stringify(finalResult.results),
-      nodeResults: JSON.stringify(finalResult.results),
-    });
-  }
+    // Update execution record
+    if (executionRecord) {
+      updateWorkflowExecution(db, executionRecord.id, {
+        status: 'completed',
+        completedAt: Date.now(),
+        durationMs,
+        outputData: JSON.stringify(finalResult.results),
+        nodeResults: JSON.stringify(finalResult.results),
+      });
+    }
 
-  onProgress?.({ type: 'complete', data: finalResult });
-  return finalResult;
+    onProgress?.({ type: 'complete', data: finalResult });
+    return finalResult;
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const finalResult = {

@@ -9,7 +9,7 @@ import {
   countTokens,
   countMessageTokens,
   countMessagesTokens,
-  estimateTokensFallback,
+  estimateTokens,
 } from '../lib/token-counter.js';
 
 /**
@@ -28,27 +28,30 @@ export const registerTokensHandlers = (): void => {
         success: false,
         error: error instanceof Error ? error.message : String(error),
         // Provide fallback estimate
-        count: estimateTokensFallback(text),
+        count: estimateTokens(text),
       };
     }
   });
 
   // Count tokens in a single message
-  ipcMain.handle('tokens:countMessage', (_, message: { role?: string; content?: string }, modelId?: string) => {
-    try {
-      return {
-        success: true,
-        count: countMessageTokens(message, modelId || 'gpt-4'),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-        // Provide fallback estimate
-        count: Math.ceil((message.content?.length || 0) / 4),
-      };
+  ipcMain.handle(
+    'tokens:countMessage',
+    (_, message: { role?: string; content?: string }, modelId?: string) => {
+      try {
+        return {
+          success: true,
+          count: countMessageTokens(message, modelId || 'gpt-4'),
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+          // Provide fallback estimate
+          count: Math.ceil((message.content?.length || 0) / 4),
+        };
+      }
     }
-  });
+  );
 
   // Count tokens in an array of messages
   ipcMain.handle(

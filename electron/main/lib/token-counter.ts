@@ -335,7 +335,9 @@ export function getModelEncoding(modelId: string): ModelEncoding {
  */
 export function cleanupEncodingCache(): void {
   for (const encoding of encodingCache.values()) {
-    encoding.free();
+    if (typeof (encoding as any).free === 'function') {
+      (encoding as any).free();
+    }
   }
   encodingCache.clear();
 }

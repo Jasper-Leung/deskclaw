@@ -387,7 +387,7 @@ tools.file_list = {
         // Normalize path separators for glob (use forward slashes)
         const normalizedPath = fullPath.replace(/\\/g, '/');
         const globPath = `${normalizedPath}/${pattern}`;
-        const matched = await glob(globPath, { windows: true });
+        const matched = await glob(globPath);
         const matchedNames = new Set(
           matched.map((f) => {
             // Extract filename from full path (handle both separators)
