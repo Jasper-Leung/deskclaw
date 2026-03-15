@@ -11,6 +11,9 @@ next/out/
 build/
 release/
 
+# Instance data (SQLite databases, etc.)
+instance/
+
 # Electron
 *.log
 .DS_Store
