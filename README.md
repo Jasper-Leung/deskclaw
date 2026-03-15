@@ -13,28 +13,104 @@
 
 ## Overview
 
-DeskClaw is a desktop application that brings the power of AI agents to your local machine. It prioritizes privacy by storing all data locally and supports multiple AI providers including OpenAI, Anthropic, Ollama, and custom endpoints.
+DeskClaw is a desktop application that brings power of AI agents to your local machine. It prioritizes privacy by storing all data locally and supports multiple AI providers including OpenAI, Anthropic, Ollama, and custom endpoints.
+
+<!-- 📸 Screenshot: Main Application Interface -->
+<p align="center">
+  <img src="docs/screenshots/main-interface.png" alt="DeskClaw Main Interface" width="800"/>
+  <br>
+  <em>DeskClaw main application interface</em>
+</p>
 
 ## Features
+
+### Core Features
+
+<!-- 📸 Screenshot: Quick Chat Interface -->
+<p align="center">
+  <img src="docs/screenshots/quick-chat.png" alt="Quick Chat" width="700"/>
+  <br>
+  <em>Quick Chat with streaming AI responses</em>
+</p>
 
 - **Multiple AI Provider Support**: Connect to OpenAI, Anthropic, Ollama, or custom APIs
 - **Custom Model Persistence**: Add custom models with connection testing - models persist across restarts
 - **Streaming LLM Responses**: Real-time streaming output for chat interactions
 - **Session Management**: Conversations are saved and can be resumed anytime
+
+<!-- 📸 Screenshot: Workflow Visual Editor -->
+<p align="center">
+  <img src="docs/screenshots/workflow-editor.png" alt="Workflow Editor" width="800"/>
+  <br>
+  <em>Visual workflow editor with drag-and-drop nodes</em>
+</p>
+
 - **Workflow Visual Editor**: Drag-and-drop workflow canvas with multiple node types
 - **Approval Gate**: Security mechanism for dangerous shell commands
 - **Local Data Storage**: All conversations, agents, and workflows stored locally with SQLite
 - **Encryption**: API keys encrypted with AES-256-GCM
+
+### Advanced Features
+
 - **Memory System**: Long-term memory storage for agents
 - **Scheduled Tasks**: Automate workflows with cron-like scheduling
 - **System Tray**: Background execution with quick access
 - **Modern UI**: Built with shadcn/ui and Tailwind CSS
 
+<!-- 📸 Screenshot: Agent Management -->
+<p align="center">
+  <img src="docs/screenshots/agents.png" alt="Agent Management" width="600"/>
+  <br>
+  <em>Manage AI agents with custom configurations</em>
+</p>
+
+<!-- 📸 Screenshot: Memory Vault -->
+<p align="center">
+  <img src="docs/screenshots/memory-vault.png" alt="Memory Vault" width="600"/>
+  <br>
+  <em>Long-term memory storage for AI agents</em>
+</p>
+
+<!-- 📸 Screenshot: Skills Sandbox -->
+<p align="center">
+  <img src="docs/screenshots/skills.png" alt="Skills Sandbox" width="600"/>
+  <br>
+  <em>Extend functionality with custom skills</em>
+</p>
+
+<!-- 📸 Screenshot: Provider Settings -->
+<p align="center">
+  <img src="docs/screenshots/providers.png" alt="Provider Settings" width="600"/>
+  <br>
+  <em>Configure AI providers and test connections</em>
+</p>
+
+<!-- 📸 Screenshot: Approval Gate Dialog -->
+<p align="center">
+  <img src="docs/screenshots/approval-gate.png" alt="Approval Gate" width="400"/>
+  <br>
+  <em>Security approval for dangerous operations</em>
+</p>
+
+<!-- 📸 Screenshot: Scheduled Tasks -->
+<p align="center">
+  <img src="docs/screenshots/scheduled-tasks.png" alt="Scheduled Tasks" width="600"/>
+  <br>
+  <em>Automate workflows with cron scheduling</em>
+</p>
+
+<!-- 📸 Screenshot: System Tray -->
+<p align="center">
+  <img src="docs/screenshots/system-tray.png" alt="System Tray" width="300"/>
+  <br>
+  <em>Background execution with system tray integration</em>
+</p>
+
 ## Tech Stack
 
 - **Electron**: Desktop application framework
 - **Next.js 15**: React framework with App Router
-- **React 19**: Latest React features
+- **React React 19**: Latest React features
 - **Better-SQLite3**: Local database storage
 - **shadcn/ui**: UI component library
 - **Tailwind CSS**: Utility-first styling
@@ -151,7 +227,7 @@ This will start:
 
 ### Building for Production
 
-1. Build the application:
+1. Build application:
 
 ```bash
 npm run build
@@ -188,7 +264,7 @@ npm run lint
 
 ### Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in root directory:
 
 ```env
 # Optional: Custom encryption key for API keys
@@ -244,7 +320,7 @@ const { currentModel, setCurrentModel, theme, setTheme } = useAppStore();
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-1. Fork the repository
+1. Fork repository
 2. Create a feature branch
 3. Make your changes
 4. Submit a pull request
@@ -265,7 +341,7 @@ See [SECURITY.md](SECURITY.md) for detailed security information.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 📜 Changelog
 
