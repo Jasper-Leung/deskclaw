@@ -5,7 +5,6 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { initializePresetWorkflows } from './preset-workflows.js';
 import { dbLogger } from '../lib/logger.js';
-import type { AppError } from '../../../shared/types/common.js';
 
 // Get the app data directory
 const getAppDataPath = () => {
@@ -75,8 +74,7 @@ export const decrypt = (encrypted: string): string => {
     decrypted += decipher.final('utf8');
 
     return decrypted;
-  } catch (error: unknown) {
-    const err = error as AppError;
+  } catch (_error: unknown) {
     throw new Error(
       'Failed to decrypt API key. This can happen if the app was recently updated. ' +
         'Please delete and re-add your provider to fix this issue.'
@@ -161,6 +159,40 @@ const createTables = (db: Database.Database): void => {
       is_preset INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
+    )
+  `);
+
+  // Workflow versions table - Track workflow version history
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_versions (
+      id TEXT PRIMARY KEY,
+      workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+      version INTEGER NOT NULL,
+      definition_json TEXT NOT NULL,
+      change_description TEXT,
+      created_at INTEGER NOT NULL,
+      created_by TEXT,
+      UNIQUE(workflow_id, version)
+    )
+  `);
+
+  // Workflow executions table - Track workflow execution history
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_executions (
+      id TEXT PRIMARY KEY,
+      workflow_id TEXT NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+      workflow_version INTEGER,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled')) DEFAULT 'pending',
+      started_at INTEGER,
+      completed_at INTEGER,
+      duration_ms INTEGER,
+      input_data_json TEXT,
+      output_data_json TEXT,
+      error_text TEXT,
+      node_results_json TEXT,
+      triggered_by TEXT CHECK(triggered_by IN ('manual', 'scheduled', 'api', 'sub_workflow', 'automation')),
+      trigger_source_id TEXT,
+      created_at INTEGER NOT NULL
     )
   `);
 
@@ -1058,6 +1090,18 @@ const createTables = (db: Database.Database): void => {
     CREATE INDEX IF NOT EXISTS idx_channel_messages_peer ON channel_messages(peer_id);
     CREATE INDEX IF NOT EXISTS idx_channel_messages_timestamp ON channel_messages(timestamp);
     CREATE INDEX IF NOT EXISTS idx_browser_sessions_profile ON browser_sessions(profile_id);
+  `);
+
+  // ============================================================================
+  // WORKFLOW VERSION CONTROL INDEXES
+  // ============================================================================
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_workflow_versions_workflow ON workflow_versions(workflow_id, version DESC);
+    CREATE INDEX IF NOT EXISTS idx_workflow_versions_created ON workflow_versions(created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow ON workflow_executions(workflow_id, started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_workflow_executions_status ON workflow_executions(status, started_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_workflow_executions_triggered ON workflow_executions(triggered_by, created_at DESC);
   `);
 
   // Initialize preset workflows

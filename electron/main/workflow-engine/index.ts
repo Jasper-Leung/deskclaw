@@ -6,6 +6,12 @@ import { executeShell } from '../ipc/shell.js';
 import { executeTool } from '../tools/index.js';
 import type { Message } from '../../../shared/types/index.js';
 import { workflowLogger } from '../lib/logger.js';
+import { countMessageTokens, countMessagesTokens } from '../lib/token-counter.js';
+import {
+  createWorkflowExecution,
+  updateWorkflowExecution,
+  getWorkflowExecutionStats,
+} from '../db/workflow-versions.js';
 
 interface WorkflowNode extends Node {
   data: Record<string, unknown>;
@@ -346,6 +352,265 @@ async function executeNode(
         return { success: true, result: { type: 'conditional', value: result } };
       }
 
+      case 'loop': {
+        const loopType = data.loopType as string || 'count';
+        const maxIterations = (data.maxIterations as number) || 10;
+        const loopCondition = data.loopCondition as string | undefined;
+
+        // Get loop counter from context or initialize
+        let loopCount = (data._loopCount as number) || 0;
+
+        // Check if loop should continue
+        let shouldContinue = false;
+        if (loopType === 'count') {
+          shouldContinue = loopCount < maxIterations;
+        } else if (loopType === 'conditional' && loopCondition) {
+          shouldContinue = evaluateCondition(loopCondition, context.results) && loopCount < maxIterations;
+        }
+
+        if (!shouldContinue) {
+          // Loop completed
+          return {
+            success: true,
+            result: {
+              type: 'loop',
+              completed: true,
+              iterations: loopCount,
+              finalResults: Array.from(context.results.entries()).map(([key, value]) => ({
+                nodeId: key,
+                result: value,
+              })),
+            },
+          };
+        }
+
+        // Increment loop counter and signal to continue
+        loopCount++;
+        return {
+          success: true,
+          result: {
+            type: 'loop',
+            completed: false,
+            iterations: loopCount,
+            _loopCount: loopCount,
+            _continueLoop: true,
+          },
+        };
+      }
+
+      case 'delay': {
+        const delayMs = (data.delayMs as number) || 1000;
+        workflowLogger.info(`[Delay] Waiting ${delayMs}ms`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return {
+          success: true,
+          result: {
+            type: 'delay',
+            delayMs,
+            completedAt: Date.now(),
+          },
+        };
+      }
+
+      case 'variable': {
+        const variableName = data.variableName as string | undefined;
+        const variableValue = data.value;
+        const transformType = data.transformType as string | undefined;
+
+        if (!variableName) {
+          return { success: false, result: null, error: 'Variable node missing variableName' };
+        }
+
+        let finalValue = variableValue;
+
+        // Apply transformations if specified
+        if (transformType) {
+          switch (transformType) {
+            case 'uppercase':
+              finalValue = String(variableValue || '').toUpperCase();
+              break;
+            case 'lowercase':
+              finalValue = String(variableValue || '').toLowerCase();
+              break;
+            case 'trim':
+              finalValue = String(variableValue || '').trim();
+              break;
+            case 'json_parse':
+              try {
+                finalValue = JSON.parse(String(variableValue || '{}'));
+              } catch {
+                return { success: false, result: null, error: 'Failed to parse JSON value' };
+              }
+              break;
+            case 'json_stringify':
+              try {
+                finalValue = JSON.stringify(variableValue);
+              } catch {
+                return { success: false, result: null, error: 'Failed to stringify value' };
+              }
+              break;
+            case 'length':
+              finalValue = String(variableValue || '').length;
+              break;
+            case 'split':
+              finalValue = String(variableValue || '').split((data.separator as string) || ',');
+              break;
+            case 'join':
+              if (Array.isArray(variableValue)) {
+                finalValue = variableValue.join((data.separator as string) || ',');
+              }
+              break;
+          }
+        }
+
+        // Store variable in context for use by subsequent nodes
+        context.results.set(`var_${variableName}`, { success: true, result: finalValue });
+
+        return {
+          success: true,
+          result: {
+            type: 'variable',
+            variableName,
+            value: finalValue,
+          },
+        };
+      }
+
+      case 'merge': {
+        const mergeType = data.mergeType as string || 'all';
+        const sourceNodeIds = data.sourceNodeIds as string[] || [];
+
+        const mergedResults: Record<string, unknown> = {};
+
+        if (sourceNodeIds.length > 0) {
+          // Merge results from specific source nodes
+          for (const sourceId of sourceNodeIds) {
+            const sourceResult = context.results.get(sourceId);
+            if (sourceResult) {
+              mergedResults[sourceId] = sourceResult;
+            }
+          }
+        } else {
+          // Merge all previous results
+          for (const [key, value] of context.results.entries()) {
+            mergedResults[key] = value;
+          }
+        }
+
+        return {
+          success: true,
+          result: {
+            type: 'merge',
+            mergeType,
+            results: mergedResults,
+            count: Object.keys(mergedResults).length,
+          },
+        };
+      }
+
+      case 'switch': {
+        const switchExpression = data.expression as string | undefined;
+        const cases = data.cases as Record<string, string> | undefined;
+        const defaultValue = data.default as string | undefined;
+
+        if (!switchExpression) {
+          return { success: false, result: null, error: 'Switch node missing expression' };
+        }
+
+        // Evaluate the expression
+        let matchedCase = defaultValue || null;
+
+        if (cases) {
+          // Direct match
+          if (switchExpression in cases) {
+            matchedCase = cases[switchExpression];
+          } else {
+            // Pattern matching for wildcards
+            for (const [pattern, value] of Object.entries(cases)) {
+              if (pattern.includes('*')) {
+                const regexPattern = pattern.replace(/\*/g, '.*');
+                const regex = new RegExp(`^${regexPattern}$`);
+                if (regex.test(switchExpression)) {
+                  matchedCase = value;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        return {
+          success: true,
+          result: {
+            type: 'switch',
+            expression: switchExpression,
+            matchedValue: matchedCase,
+            cases,
+          },
+        };
+      }
+
+      case 'sub-workflow': {
+        const subWorkflowId = data.workflowId as string | undefined;
+        const subWorkflowName = data.workflowName as string | undefined;
+        const passParameters = data.parameters as Record<string, unknown> | undefined;
+
+        if (!subWorkflowId && !subWorkflowName) {
+          return { success: false, result: null, error: 'Sub-workflow node missing workflowId or workflowName' };
+        }
+
+        // Get the sub-workflow definition
+        let targetWorkflowId = subWorkflowId;
+        if (!targetWorkflowId && subWorkflowName) {
+          // Look up workflow by name
+          const workflowRow = context.db
+            .prepare('SELECT id FROM workflows WHERE name = ?')
+            .get(subWorkflowName) as { id: string } | undefined;
+          if (!workflowRow) {
+            return { success: false, result: null, error: `Sub-workflow not found: ${subWorkflowName}` };
+          }
+          targetWorkflowId = workflowRow.id;
+        }
+
+        // Get workflow definition from database
+        const workflowDef = context.db
+          .prepare('SELECT definition_json FROM workflows WHERE id = ?')
+          .get(targetWorkflowId) as { definition_json: string } | undefined;
+
+        if (!workflowDef) {
+          return { success: false, result: null, error: `Sub-workflow definition not found: ${targetWorkflowId}` };
+        }
+
+        const workflowDefinition = JSON.parse(workflowDef.definition_json);
+
+        // Merge parameters into context
+        if (passParameters) {
+          for (const [key, value] of Object.entries(passParameters)) {
+            context.results.set(`param_${key}`, { success: true, result: value });
+          }
+        }
+
+        // Execute the sub-workflow
+        const { executeWorkflow } = await import('./index.js');
+        const subResult = await executeWorkflow(
+          context.db,
+          targetWorkflowId,
+          workflowDefinition.nodes,
+          workflowDefinition.edges
+        );
+
+        return {
+          success: subResult.success,
+          result: {
+            type: 'sub-workflow',
+            workflowId: targetWorkflowId,
+            workflowName: subWorkflowName,
+            subResult,
+          },
+          error: subResult.error,
+        };
+      }
+
       default:
         return { success: false, result: null, error: `Unknown node type: ${nodeType}` };
     }
@@ -383,20 +648,43 @@ function evaluateCondition(condition: string, context: Map<string, unknown>): bo
 }
 
 /**
- * Estimate token count for a message (rough approximation)
+ * Estimate token count for a message using accurate tokenizer
+ * Falls back to character-based estimation if tokenizer fails
  */
-function estimateTokens(message: Message): number {
-  // Rough estimate: ~4 characters per token
-  return Math.ceil(message.content.length / 4);
+function estimateTokens(message: Message, modelId: string = 'gpt-4'): number {
+  if (!message.content) {
+    return 0;
+  }
+
+  try {
+    return countMessageTokens(message, modelId);
+  } catch (error) {
+    // Fallback to rough estimate if encoding fails
+    workflowLogger.warn(`[Token] Falling back to character-based estimation: ${error}`);
+    return Math.ceil(message.content.length / 4);
+  }
+}
+
+/**
+ * Calculate total tokens for an array of messages
+ */
+function estimateTotalTokens(messages: Message[], modelId: string = 'gpt-4'): number {
+  try {
+    return countMessagesTokens(messages, modelId);
+  } catch (error) {
+    // Fallback to rough estimate if encoding fails
+    workflowLogger.warn(`[Token] Falling back to character-based estimation: ${error}`);
+    return messages.reduce((sum, msg) => sum + Math.ceil((msg.content?.length || 0) / 4), 0);
+  }
 }
 
 /**
  * Compress message history when approaching context limit
  * Smart compression that preserves important context while reducing token usage
  */
-function compressMessageHistory(messages: Message[], maxTokens: number = 50000): Message[] {
+function compressMessageHistory(messages: Message[], maxTokens: number = 100000, modelId: string = 'gpt-4'): Message[] {
   // Calculate total tokens
-  let totalTokens = messages.reduce((sum, msg) => sum + estimateTokens(msg), 0);
+  let totalTokens = estimateTotalTokens(messages, modelId);
 
   if (totalTokens <= maxTokens) {
     return messages;
@@ -479,7 +767,7 @@ function compressMessageHistory(messages: Message[], maxTokens: number = 50000):
   compressed.push(...assistantMessages);
 
   // Recalculate tokens
-  totalTokens = compressed.reduce((sum, msg) => sum + estimateTokens(msg), 0);
+  totalTokens = estimateTotalTokens(compressed, modelId);
   workflowLogger.info(
     `[Context] After compression: ${totalTokens} tokens, ${compressed.length} messages, ${screenshotCount} screenshots compressed`
   );
@@ -495,24 +783,52 @@ export async function executeWorkflow(
   workflowId: string,
   nodes: Node[],
   edges: Edge[],
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  options?: {
+    triggeredBy?: 'manual' | 'scheduled' | 'api' | 'sub_workflow' | 'automation';
+    triggerSourceId?: string;
+    inputData?: string;
+    enableVersionTracking?: boolean;
+  }
 ): Promise<ExecutionResult> {
   const executionId = randomUUID();
   const workflowNodes: WorkflowNode[] = nodes as WorkflowNode[];
   const workflowEdges: WorkflowEdge[] = edges as WorkflowEdge[];
 
-  // Sort nodes in execution order
-  const sortedNodes = topologicalSort(workflowNodes, workflowEdges);
+  // Create execution record if version tracking is enabled
+  let executionRecord: Awaited<ReturnType<typeof createWorkflowExecution>> | undefined;
+  if (options?.enableVersionTracking !== false) {
+    executionRecord = createWorkflowExecution(db, {
+      workflowId,
+      triggeredBy: options?.triggeredBy,
+      triggerSourceId: options?.triggerSourceId,
+      inputData: options?.inputData,
+    });
+  }
 
-  // Build context
-  const nodeMap = new Map(sortedNodes.map((node) => [node.id, node]));
-  const context: ExecutionContext = {
-    nodes: nodeMap,
-    edges: workflowEdges,
-    results: new Map(),
-    db,
-    messageHistory: [],
-  };
+  // Update execution status to running
+  if (executionRecord) {
+    updateWorkflowExecution(db, executionRecord.id, {
+      status: 'running',
+      startedAt: Date.now(),
+    });
+  }
+
+  const startTime = Date.now();
+
+  try {
+    // Sort nodes in execution order
+    const sortedNodes = topologicalSort(workflowNodes, workflowEdges);
+
+    // Build context
+    const nodeMap = new Map(sortedNodes.map((node) => [node.id, node]));
+    const context: ExecutionContext = {
+      nodes: nodeMap,
+      edges: workflowEdges,
+      results: new Map(),
+      db,
+      messageHistory: [],
+    };
 
   // Execute nodes sequentially
   for (const node of sortedNodes) {
@@ -549,8 +865,84 @@ export async function executeWorkflow(
       }
     }
 
+    // Handle loop nodes
+    if (node.type === 'loop') {
+      const loopResult = result as { type: string; completed: boolean; _continueLoop?: boolean; iterations?: number };
+
+      if (!loopResult.completed && loopResult._continueLoop) {
+        // Find loop body nodes (nodes connected to the loop's output)
+        const loopBodyEdges = workflowEdges.filter((e) => e.source === node.id);
+        const loopBodyNodeIds = loopBodyEdges.map((e) => e.target).filter(Boolean);
+
+        // Find the node that should loop back (look for edge pointing back to loop or to node after loop body)
+        const loopBackEdge = workflowEdges.find((e) =>
+          loopBodyNodeIds.includes(e.target) && loopBodyNodeIds.includes(e.source)
+        );
+
+        // Update the loop node's data with the new iteration count
+        node.data = { ...node.data, _loopCount: loopResult.iterations };
+
+        // Re-execute the loop body nodes for the next iteration
+        if (loopBackEdge && loopBodyNodeIds.length > 0) {
+          // Get the node to restart the loop from (first node in loop body)
+          const loopStartNodeId = loopBodyNodeIds[0];
+
+          // Find position of loop start node in sorted nodes
+          const loopStartIndex = sortedNodes.findIndex((n) => n.id === loopStartNodeId);
+
+          if (loopStartIndex !== -1) {
+            // Continue execution from the loop start node
+            for (let i = loopStartIndex; i < sortedNodes.length; i++) {
+              const loopNode = sortedNodes[i];
+              // Skip nodes that are not part of the loop body
+              if (!loopBodyNodeIds.includes(loopNode.id)) {
+                break;
+              }
+
+              const loopNodeName = String(loopNode.data?.label || loopNode.id);
+              onProgress?.({ type: 'node_start', nodeId: loopNode.id, nodeName: loopNodeName });
+
+              const { success: lSuccess, result: lResult, error: lError } = await executeNode(loopNode, context);
+              context.results.set(loopNode.id, { success: lSuccess, result: lResult, error: lError });
+
+              if (lSuccess) {
+                onProgress?.({ type: 'node_complete', nodeId: loopNode.id, nodeName: loopNodeName, data: lResult });
+              } else {
+                onProgress?.({ type: 'node_error', nodeId: loopNode.id, nodeName: loopNodeName, error: lError });
+              }
+
+              // Stop loop on failure
+              if (!lSuccess) {
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Handle switch nodes (multi-way branching)
+    if (node.type === 'switch') {
+      const switchResult = result as { type: string; matchedValue: string | null };
+
+      // Find outgoing edges and filter by matched value
+      const outgoingEdges = workflowEdges.filter((e) => e.source === node.id);
+      const matchedValue = switchResult.matchedValue;
+
+      // Remove nodes that don't match the switch case
+      for (const edge of outgoingEdges) {
+        if (edge.sourceHandle && edge.sourceHandle !== String(matchedValue)) {
+          const targetNode = context.nodes.get(edge.target!);
+          if (targetNode) {
+            context.results.set(edge.target!, { success: true, result: null, skipped: true });
+          }
+        }
+      }
+    }
+
     // Stop execution on critical failure
-    if (!success && node.type !== 'conditional') {
+    if (!success && !['conditional', 'loop', 'switch'].includes(node.type)) {
+      const durationMs = Date.now() - startTime;
       const finalResult = {
         success: false,
         workflowId,
@@ -559,11 +951,25 @@ export async function executeWorkflow(
         results: Object.fromEntries(context.results),
         error: `Node ${node.id} failed: ${error}`,
       };
+
+      // Update execution record
+      if (executionRecord) {
+        updateWorkflowExecution(db, executionRecord.id, {
+          status: 'failed',
+          completedAt: Date.now(),
+          durationMs,
+          error: finalResult.error,
+          nodeResults: JSON.stringify(finalResult.results),
+        });
+      }
+
       onProgress?.({ type: 'complete', data: finalResult });
       return finalResult;
     }
   }
 
+  // Calculate final result
+  const durationMs = Date.now() - startTime;
   const finalResult = {
     success: true,
     workflowId,
@@ -571,6 +977,43 @@ export async function executeWorkflow(
     status: 'completed' as const,
     results: Object.fromEntries(context.results),
   };
+
+  // Update execution record
+  if (executionRecord) {
+    updateWorkflowExecution(db, executionRecord.id, {
+      status: 'completed',
+      completedAt: Date.now(),
+      durationMs,
+      outputData: JSON.stringify(finalResult.results),
+      nodeResults: JSON.stringify(finalResult.results),
+    });
+  }
+
   onProgress?.({ type: 'complete', data: finalResult });
   return finalResult;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+    const finalResult = {
+      success: false,
+      workflowId,
+      executionId,
+      status: 'failed' as const,
+      results: Object.fromEntries(context?.results || []),
+      error: error instanceof Error ? error.message : String(error),
+    };
+
+    // Update execution record
+    if (executionRecord) {
+      updateWorkflowExecution(db, executionRecord.id, {
+        status: 'failed',
+        completedAt: Date.now(),
+        durationMs,
+        error: finalResult.error,
+        nodeResults: JSON.stringify(finalResult.results),
+      });
+    }
+
+    onProgress?.({ type: 'complete', data: finalResult });
+    return finalResult;
+  }
 }

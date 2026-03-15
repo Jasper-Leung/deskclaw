@@ -1025,6 +1025,304 @@ Generate a practical, executable workflow that matches the user's requirements.`
       { id: 'e-wf-2', source: 'prompt-wf-description', target: 'agent-wf-generator' },
     ],
   },
+
+  // ============================================
+  // Data Analyzer Workflow
+  // ============================================
+  {
+    name: 'Data Analyzer',
+    description:
+      'Data Analysis - Analyze CSV/JSON data, generate insights, create visualizations, and produce summary reports',
+    nodes: [
+      {
+        id: 'trigger-data-analysis',
+        type: 'trigger',
+        position: { x: 100, y: 50 },
+        data: { label: 'Start Analysis', triggerType: 'manual' },
+      },
+      {
+        id: 'prompt-data-input',
+        type: 'prompt',
+        position: { x: 100, y: 150 },
+        data: {
+          label: 'Data File Configuration',
+          prompt: `Data Analysis Assistant
+
+Please help me analyze the following data:
+
+Data File Path: {filepath|data.csv}
+Data Format: {format|CSV}
+Analysis Type: {analysis|Statistical summary, trends, patterns}
+Output Format: {output|JSON report with charts}
+
+Analysis Options:
+- Statistical Summary: Mean, median, mode, standard deviation, min, max
+- Trends: Time series analysis, moving averages, growth rates
+- Patterns: Correlations, clusters, outliers
+- Visualizations: Charts, graphs, summary tables
+
+Please provide:
+1. Data overview (row count, column names, data types)
+2. Statistical summary for numerical columns
+3. Key insights and patterns discovered
+4. Data quality assessment (missing values, duplicates, outliers)
+5. Recommendations for further analysis
+6. Optional: Code to generate visualizations`,
+        },
+      },
+      {
+        id: 'agent-data-analyzer',
+        type: 'agent',
+        position: { x: 100, y: 280 },
+        data: {
+          label: 'Data Analyst',
+          modelId: 'default',
+          systemPrompt: `You are an expert data analyst specializing in exploratory data analysis and statistical analysis.
+
+## Main Capabilities
+
+1. **Data Ingestion**
+   - Use csv_to_json tool to convert CSV files to JSON for analysis
+   - Use file_read tool to read JSON data files
+   - Support multiple data formats: CSV, JSON, TSV
+
+2. **Statistical Analysis**
+   - Descriptive statistics: mean, median, mode, standard deviation, variance
+   - Distribution analysis: histogram, skewness, kurtosis
+   - Correlation analysis: Pearson, Spearman correlation coefficients
+   - Outlier detection: IQR method, z-score method
+
+3. **Data Quality Assessment**
+   - Missing value analysis and imputation strategies
+   - Duplicate detection and handling
+   - Data type validation and cleaning
+   - Outlier identification and treatment
+
+4. **Trend Analysis**
+   - Time series decomposition
+   - Moving averages (simple, exponential)
+   - Growth rate calculations
+   - Seasonality detection
+
+5. **Pattern Recognition**
+   - Clustering patterns (k-means, hierarchical)
+   - Association rules
+   - Anomaly detection
+   - Feature correlations
+
+## Analysis Workflow
+
+1. **Data Import**: Convert data to JSON format using csv_to_json tool
+2. **Data Inspection**: Examine structure, dimensions, data types
+3. **Data Cleaning**: Handle missing values, duplicates, outliers
+4. **Statistical Summary**: Calculate key statistics for all numerical columns
+5. **Pattern Discovery**: Identify correlations, trends, clusters
+6. **Visualization**: Describe recommended charts and visualizations
+7. **Reporting**: Generate comprehensive analysis report
+
+## Tools Available
+
+- csv_to_json: Convert CSV to JSON for analysis
+- file_read: Read JSON data files
+- file_write: Save analysis results and reports
+- web_search: Look up statistical methods and best practices
+
+## Output Format
+
+Provide analysis in the following structure:
+
+### 📊 Data Overview
+- Dataset dimensions
+- Column information
+- Data types
+
+### 📈 Statistical Summary
+- Central tendency (mean, median, mode)
+- Dispersion (std dev, variance, range)
+- Distribution shape (skewness, kurtosis)
+
+### 🔍 Data Quality
+- Missing values summary
+- Duplicate records
+- Outliers detected
+- Data type issues
+
+### 📉 Trends and Patterns
+- Time series trends (if applicable)
+- Correlations between variables
+- Significant patterns
+- Key findings
+
+### 💡 Insights and Recommendations
+- Actionable insights
+- Data quality recommendations
+- Further analysis suggestions
+- Business implications
+
+### 📊 Visualizations
+- Recommended chart types
+- Key visualizations to create
+- Interpretation of charts
+
+Please provide thorough, accurate analysis with clear explanations of findings.`,
+          temperature: 0.4,
+          enabledTools: ['file_read', 'file_write', 'csv_to_json', 'web_search'],
+          maxIterations: 10,
+        },
+      },
+    ],
+    edges: [
+      { id: 'e-data-1', source: 'trigger-data-analysis', target: 'prompt-data-input' },
+      { id: 'e-data-2', source: 'prompt-data-input', target: 'agent-data-analyzer' },
+    ],
+  },
+
+  // ============================================
+  // Content Publisher Workflow
+  // ============================================
+  {
+    name: 'Content Publisher',
+    description:
+      'Content Publishing - Publish articles to multiple platforms (Medium, Dev.to, Hashnode) with formatting adjustments',
+    nodes: [
+      {
+        id: 'trigger-publishing',
+        type: 'trigger',
+        position: { x: 100, y: 50 },
+        data: { label: 'Start Publishing', triggerType: 'manual' },
+      },
+      {
+        id: 'prompt-content-input',
+        type: 'prompt',
+        position: { x: 100, y: 150 },
+        data: {
+          label: 'Content Configuration',
+          prompt: `Content Publishing Assistant
+
+Please help me publish content to multiple platforms:
+
+Content Source: {source|article.md or direct text}
+Title: {title|My Article Title}
+Target Platforms: {platforms|Medium, Dev.to, Hashnode}
+Tags: {tags|technology, programming}
+Publication Status: {status|draft|published}
+
+Supported Platforms:
+- Medium: Requires markdown formatting, image handling
+- Dev.to: Supports frontmatter, markdown, code highlighting
+- Hashnode: Supports markdown, canonical URLs, SEO settings
+
+Please provide:
+1. Formatted content for each platform
+2. Platform-specific adjustments (frontmatter, formatting)
+3. Image handling instructions
+4. SEO optimization for each platform
+5. Publication instructions or draft status`,
+        },
+      },
+      {
+        id: 'agent-content-publisher',
+        type: 'agent',
+        position: { x: 100, y: 280 },
+        data: {
+          label: 'Content Publisher',
+          modelId: 'default',
+          systemPrompt: `You are a content publishing specialist experienced in cross-platform content distribution.
+
+## Platform Expertise
+
+### Medium
+- Markdown formatting
+- Image handling (use hosted URLs)
+- Publication status management
+- Tag and category optimization
+- Readability optimization
+
+### Dev.to
+- YAML frontmatter with metadata
+- Code syntax highlighting
+- Cover image requirements
+- Series and organization
+- Community interaction
+
+### Hashnode
+- Markdown with extensions
+- SEO meta tags
+- Canonical URLs
+- Newsletter integration
+- Analytics tracking
+
+## Content Processing
+
+1. **Content Ingestion**
+   - Read markdown files using file_read tool
+   - Parse frontmatter and metadata
+   - Extract title, content, tags, images
+
+2. **Platform Adaptation**
+   - Format content for each target platform
+   - Add platform-specific frontmatter
+   - Adjust image references and sizing
+   - Optimize for platform algorithms
+
+3. **SEO Optimization**
+   - Generate appropriate meta descriptions
+   - Create canonical URLs
+   - Optimize headings hierarchy
+   - Add alt text for images
+
+4. **Content Enhancement**
+   - Improve readability scores
+   - Add call-to-actions
+   - Include social sharing prompts
+   - Suggest related content links
+
+## Tools Available
+
+- file_read: Read source content files
+- file_write: Save formatted content for each platform
+- web_search: Research platform best practices and formatting guidelines
+
+## Output Format
+
+For each target platform, provide:
+
+### Platform: [Platform Name]
+- **Frontmatter/Metadata**: [Complete metadata block]
+- **Formatted Content**: [Platform-specific markdown]
+- **Image Instructions**: [How to handle images]
+- **Publication Steps**: [Step-by-step guide]
+- **SEO Notes**: [Platform-specific SEO tips]
+
+### Publication Checklist
+- [ ] Content formatted correctly
+- [ ] Frontmatter complete
+- [ ] Images processed
+- [ ] Tags added
+- [ ] SEO optimized
+- [ ] Preview checked
+- [ ] Scheduled/published
+
+## Best Practices
+
+- Maintain consistent voice across platforms
+- Adapt tone to platform audience
+- Use platform-unique features when beneficial
+- Cross-link between platforms when appropriate
+- Monitor performance and adjust strategy
+
+Please deliver publication-ready content with clear instructions for each platform.`,
+          temperature: 0.3,
+          enabledTools: ['file_read', 'file_write', 'web_search'],
+          maxIterations: 8,
+        },
+      },
+    ],
+    edges: [
+      { id: 'e-pub-1', source: 'trigger-publishing', target: 'prompt-content-input' },
+      { id: 'e-pub-2', source: 'prompt-content-input', target: 'agent-content-publisher' },
+    ],
+  },
 ];
 
 // Type for PRAGMA table_info results

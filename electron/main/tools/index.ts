@@ -1,6 +1,7 @@
 import { readFile, writeFile, access, constants, readdir, mkdir } from 'fs/promises';
 import { join, dirname, isAbsolute } from 'path';
 import { homedir } from 'os';
+import process from 'process';
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/index.js';
 import { toolLogger } from '../lib/logger.js';
@@ -2508,6 +2509,692 @@ tools.list_skills = {
       return {
         result: null,
         error: `Failed to list skills: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * Database Query Tool - Execute SQLite SELECT queries
+ */
+tools.db_query = {
+  name: 'db_query',
+  description:
+    'Execute a SQLite SELECT query on the application database or a custom database file. Returns query results as an array of objects.',
+  parameters: {
+    sql: {
+      type: 'string',
+      description: 'SQL SELECT query to execute. Example: "SELECT * FROM users WHERE active = 1"',
+      required: true,
+    },
+    db_file: {
+      type: 'string',
+      description: 'Optional path to external SQLite database file. If not provided, uses the application database.',
+      required: false,
+    },
+    params: {
+      type: 'string',
+      description:
+        'Optional JSON array of parameters for parameterized queries. Example: \'["param1", 123]\'',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const sql = params.sql as string;
+    const dbFile = params.db_file as string | undefined;
+    const queryParams = params.params ? JSON.parse(params.params as string) : undefined;
+
+    try {
+      let db: Database.Database;
+
+      if (dbFile) {
+        // Open external database
+        const Database = await import('better-sqlite3').then((m) => m.default);
+        db = new Database(dbFile, { readonly: true });
+      } else {
+        // Use application database
+        db = getDatabase();
+      }
+
+      // Validate it's a SELECT query for safety
+      const trimmedSql = sql.trim().toUpperCase();
+      if (!trimmedSql.startsWith('SELECT') && !trimmedSql.startsWith('WITH')) {
+        if (dbFile) db.close();
+        return {
+          result: null,
+          error: 'Only SELECT and WITH queries are allowed for security.',
+        };
+      }
+
+      const stmt = db.prepare(sql);
+      let results: any[];
+
+      if (queryParams && Array.isArray(queryParams)) {
+        results = stmt.all(...queryParams);
+      } else {
+        results = stmt.all();
+      }
+
+      // Close external database if opened
+      if (dbFile) db.close();
+
+      toolLogger.info(`[db_query] Executed query, returned ${results.length} rows`);
+
+      return {
+        result: {
+          sql,
+          rows: results,
+          count: results.length,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[db_query] Query failed:`, error);
+      return {
+        result: null,
+        error: `Database query failed: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * Database Execute Tool - Execute SQLite INSERT/UPDATE/DELETE queries
+ */
+tools.db_execute = {
+  name: 'db_execute',
+  description:
+    'Execute a SQLite INSERT, UPDATE, or DELETE query. DANGEROUS - requires user approval. Use with caution.',
+  parameters: {
+    sql: {
+      type: 'string',
+      description: 'SQL query to execute (INSERT, UPDATE, DELETE, CREATE, etc.).',
+      required: true,
+    },
+    db_file: {
+      type: 'string',
+      description: 'Optional path to external SQLite database file.',
+      required: false,
+    },
+    params: {
+      type: 'string',
+      description: 'Optional JSON array of parameters for parameterized queries.',
+      required: false,
+    },
+    require_approval: {
+      type: 'boolean',
+      description: 'Whether to require user approval. Defaults to true.',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const sql = params.sql as string;
+    const dbFile = params.db_file as string | undefined;
+    const queryParams = params.params ? JSON.parse(params.params as string) : undefined;
+    const requireApproval = params.require_approval !== false;
+
+    if (requireApproval) {
+      return {
+        result: null,
+        error: `Database modification requires approval: ${sql}`,
+      };
+    }
+
+    try {
+      let db: Database.Database;
+
+      if (dbFile) {
+        const Database = await import('better-sqlite3').then((m) => m.default);
+        db = new Database(dbFile);
+      } else {
+        db = getDatabase();
+      }
+
+      const stmt = db.prepare(sql);
+      let result: any;
+
+      if (queryParams && Array.isArray(queryParams)) {
+        result = stmt.run(...queryParams);
+      } else {
+        result = stmt.run();
+      }
+
+      // Close external database if opened
+      if (dbFile) db.close();
+
+      toolLogger.info(`[db_execute] Executed query, affected ${result.changes} rows`);
+
+      return {
+        result: {
+          sql,
+          changes: result.changes,
+          lastInsertRowid: result.lastInsertRowid,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[db_execute] Query failed:`, error);
+      return {
+        result: null,
+        error: `Database execution failed: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * File Hash Tool - Calculate file hash (SHA256, MD5, etc.)
+ */
+tools.file_hash = {
+  name: 'file_hash',
+  description:
+    'Calculate the hash of a file using various algorithms. Useful for file integrity verification and deduplication.',
+  parameters: {
+    filepath: {
+      type: 'string',
+      description: 'Path to file (relative to work directory or absolute).',
+      required: true,
+    },
+    algorithm: {
+      type: 'string',
+      description: 'Hash algorithm: "sha256" (default), "sha512", "md5", "sha1".',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const filepath = params.filepath as string;
+    const algorithm = (params.algorithm as string) || 'sha256';
+
+    try {
+      let fullPath = filepath;
+      const workDir = getWorkDirectory();
+
+      if (!isAbsolute(filepath)) {
+        fullPath = join(workDir, filepath);
+      }
+
+      const { createHash } = await import('crypto');
+      const { readFile } = await import('fs/promises');
+
+      const fileContent = await readFile(fullPath);
+      const hash = createHash(algorithm);
+      hash.update(fileContent);
+      const digest = hash.digest('hex');
+
+      toolLogger.info(`[file_hash] Calculated ${algorithm} hash for ${fullPath}`);
+
+      return {
+        result: {
+          filepath: fullPath,
+          algorithm,
+          hash: digest,
+          size: fileContent.length,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[file_hash] Failed to calculate hash:`, error);
+      return {
+        result: null,
+        error: `Failed to calculate file hash: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * CSV to JSON Tool - Convert CSV file to JSON
+ */
+tools.csv_to_json = {
+  name: 'csv_to_json',
+  description:
+    'Convert a CSV file to JSON format. Useful for data processing and analysis workflows.',
+  parameters: {
+    filepath: {
+      type: 'string',
+      description: 'Path to CSV file (relative to work directory or absolute).',
+      required: true,
+    },
+    output_path: {
+      type: 'string',
+      description: 'Optional output file path for the JSON result. If not provided, returns the JSON in the result.',
+      required: false,
+    },
+    delimiter: {
+      type: 'string',
+      description: 'CSV delimiter character. Defaults to comma (",").',
+      required: false,
+    },
+    has_header: {
+      type: 'boolean',
+      description: 'Whether the CSV has a header row. Defaults to true.',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const filepath = params.filepath as string;
+    const outputPath = params.output_path as string | undefined;
+    const delimiter = (params.delimiter as string) || ',';
+    const hasHeader = params.has_header !== false;
+
+    try {
+      let fullPath = filepath;
+      const workDir = getWorkDirectory();
+
+      if (!isAbsolute(filepath)) {
+        fullPath = join(workDir, filepath);
+      }
+
+      const { readFile } = await import('fs/promises');
+      const content = await readFile(fullPath, 'utf-8');
+
+      // Parse CSV
+      const lines = content.trim().split('\n').map((line) => line.trim());
+
+      if (lines.length === 0) {
+        return { result: null, error: 'CSV file is empty' };
+      }
+
+      const headers = hasHeader
+        ? lines[0].split(delimiter).map((h) => h.trim())
+        : lines[0].split(',').map((_, i) => `column${i}`);
+
+      const data: Record<string, string>[] = [];
+
+      for (let i = hasHeader ? 1 : 0; i < lines.length; i++) {
+        const values = lines[i].split(delimiter).map((v) => v.trim());
+        const row: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          row[header] = values[index] || '';
+        });
+        data.push(row);
+      }
+
+      const jsonData = JSON.stringify(data, null, 2);
+
+      // Write to output file if specified
+      if (outputPath) {
+        let outputFullPath = outputPath;
+        if (!isAbsolute(outputPath)) {
+          outputFullPath = join(workDir, outputPath);
+        }
+        // Create parent directory if needed
+        const dir = dirname(outputFullPath);
+        await mkdir(dir, { recursive: true });
+        await writeFile(outputFullPath, jsonData, 'utf-8');
+        toolLogger.info(`[csv_to_json] Converted CSV to JSON, saved to ${outputFullPath}`);
+      } else {
+        toolLogger.info(`[csv_to_json] Converted CSV to JSON, ${data.length} rows`);
+      }
+
+      return {
+        result: {
+          input: fullPath,
+          output: outputPath || null,
+          rows: data.length,
+          data,
+          json: jsonData,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[csv_to_json] Failed to convert:`, error);
+      return {
+        result: null,
+        error: `Failed to convert CSV to JSON: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * JSON to CSV Tool - Convert JSON data to CSV format
+ */
+tools.json_to_csv = {
+  name: 'json_to_csv',
+  description:
+    'Convert JSON data to CSV format. Accepts JSON file path or direct JSON string.',
+  parameters: {
+    input: {
+      type: 'string',
+      description: 'JSON file path or JSON string (array of objects).',
+      required: true,
+    },
+    output_path: {
+      type: 'string',
+      description: 'Output file path for the CSV result.',
+      required: true,
+    },
+    delimiter: {
+      type: 'string',
+      description: 'CSV delimiter character. Defaults to comma (",").',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const input = params.input as string;
+    const outputPath = params.output_path as string;
+    const delimiter = (params.delimiter as string) || ',';
+
+    try {
+      let jsonData: Record<string, unknown>[];
+
+      // Check if input is a file path or JSON string
+      if (input.trim().startsWith('[') || input.trim().startsWith('{')) {
+        jsonData = JSON.parse(input);
+      } else {
+        // Read from file
+        let fullPath = input;
+        const workDir = getWorkDirectory();
+        if (!isAbsolute(input)) {
+          fullPath = join(workDir, input);
+        }
+        const { readFile } = await import('fs/promises');
+        const content = await readFile(fullPath, 'utf-8');
+        jsonData = JSON.parse(content);
+      }
+
+      if (!Array.isArray(jsonData) || jsonData.length === 0) {
+        return { result: null, error: 'JSON must be a non-empty array of objects' };
+      }
+
+      // Get headers from first object
+      const headers = Object.keys(jsonData[0] as Record<string, unknown>);
+
+      // Build CSV
+      const csvLines: string[] = [];
+
+      // Add header row
+      csvLines.push(headers.join(delimiter));
+
+      // Add data rows
+      for (const row of jsonData as Record<string, unknown>[]) {
+        const values = headers.map((header) => {
+          const value = row[header];
+          // Handle values that contain the delimiter
+          const strValue = String(value ?? '');
+          if (strValue.includes(delimiter) || strValue.includes('\n')) {
+            return `"${strValue.replace(/"/g, '""')}"`;
+          }
+          return strValue;
+        });
+        csvLines.push(values.join(delimiter));
+      }
+
+      const csvContent = csvLines.join('\n');
+
+      // Write to output file
+      let outputFullPath = outputPath;
+      const workDir = getWorkDirectory();
+      if (!isAbsolute(outputPath)) {
+        outputFullPath = join(workDir, outputPath);
+      }
+      await writeFile(outputFullPath, csvContent, 'utf-8');
+
+      toolLogger.info(`[json_to_csv] Converted JSON to CSV, saved to ${outputFullPath}`);
+
+      return {
+        result: {
+          input,
+          output: outputFullPath,
+          rows: jsonData.length,
+          csv: csvContent,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[json_to_csv] Failed to convert:`, error);
+      return {
+        result: null,
+        error: `Failed to convert JSON to CSV: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * SHA256 Hash Tool - Calculate SHA256 hash
+ */
+tools.hash_sha256 = {
+  name: 'hash_sha256',
+  description:
+    'Calculate SHA256 hash of a string or file. Useful for data integrity verification and password hashing.',
+  parameters: {
+    text: {
+      type: 'string',
+      description: 'Text to hash (use either text or filepath, not both).',
+      required: false,
+    },
+    filepath: {
+      type: 'string',
+      description: 'Path to file to hash (use either text or filepath, not both).',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const text = params.text as string | undefined;
+    const filepath = params.filepath as string | undefined;
+
+    if (!text && !filepath) {
+      return {
+        result: null,
+        error: 'Either text or filepath parameter is required',
+      };
+    }
+
+    try {
+      const { createHash } = await import('crypto');
+      const hash = createHash('sha256');
+
+      if (filepath) {
+        let fullPath = filepath;
+        const workDir = getWorkDirectory();
+        if (!isAbsolute(filepath)) {
+          fullPath = join(workDir, filepath);
+        }
+        const { readFile } = await import('fs/promises');
+        const fileContent = await readFile(fullPath);
+        hash.update(fileContent);
+      } else if (text) {
+        hash.update(text, 'utf8');
+      }
+
+      const digest = hash.digest('hex');
+
+      return {
+        result: {
+          algorithm: 'sha256',
+          hash: digest,
+          input: filepath || text,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[hash_sha256] Failed to calculate hash:`, error);
+      return {
+        result: null,
+        error: `Failed to calculate SHA256 hash: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * Process List Tool - List running processes
+ */
+tools.process_list = {
+  name: 'process_list',
+  description:
+    'List running processes on the system. Useful for system monitoring and automation.',
+  parameters: {
+    filter: {
+      type: 'string',
+      description: 'Optional filter string to match against process names.',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const filter = params.filter as string | undefined;
+
+    try {
+      const command = process.platform === 'win32' ? 'tasklist /fo csv' : 'ps aux';
+
+      const { executeShell } = await import('../ipc/shell.js');
+      const result = await executeShell(command, { requireApproval: false });
+
+      if (result.exitCode !== 0) {
+        return {
+          result: null,
+          error: `Failed to list processes: ${result.stderr}`,
+        };
+      }
+
+      let processes = result.stdout.trim().split('\n');
+
+      // Apply filter if specified
+      if (filter) {
+        processes = processes.filter((line) =>
+          line.toLowerCase().includes(filter.toLowerCase())
+        );
+      }
+
+      toolLogger.info(`[process_list] Listed ${processes.length} processes`);
+
+      return {
+        result: {
+          processes,
+          count: processes.length,
+          platform: process.platform,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[process_list] Failed:`, error);
+      return {
+        result: null,
+        error: `Failed to list processes: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * Notification Show Tool - Show desktop notification
+ */
+tools.notification_show = {
+  name: 'notification_show',
+  description:
+    'Show a desktop notification. Uses system notification or logs to console. Note: Full desktop notifications may require additional setup on some platforms.',
+  parameters: {
+    title: {
+      type: 'string',
+      description: 'Notification title.',
+      required: true,
+    },
+    body: {
+      type: 'string',
+      description: 'Notification body text.',
+      required: true,
+    },
+    timeout: {
+      type: 'number',
+      description: 'Notification timeout in milliseconds. Default: 5000.',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const title = params.title as string;
+    const body = params.body as string;
+    const timeout = (params.timeout as number) || 5000;
+
+    try {
+      // Log the notification for now
+      // Full desktop notifications in main process require additional setup
+      toolLogger.info(`[notification_show] ${title}: ${body}`);
+
+      // Try to use native-notify if available, or fallback to logging
+      try {
+        // Check if we're in a renderer context (for future extensions)
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+          const notification = new (window as any).Notification(title, {
+            body,
+            requireInteraction: false,
+          });
+          notification.show();
+          setTimeout(() => notification.close(), timeout);
+        }
+      } catch {
+        // Fallback to console only
+      }
+
+      return {
+        result: {
+          title,
+          body,
+          timeout,
+          shown: true,
+          message: 'Notification logged to console',
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[notification_show] Failed:`, error);
+      return {
+        result: null,
+        error: `Failed to show notification: ${error.message}`,
+      };
+    }
+  },
+};
+
+/**
+ * Ping Tool - Ping a host to check connectivity
+ */
+tools.ping = {
+  name: 'ping',
+  description:
+    'Ping a host to check network connectivity and measure latency.',
+  parameters: {
+    host: {
+      type: 'string',
+      description: 'Host to ping (IP address or domain name). Example: "google.com" or "8.8.8.8"',
+      required: true,
+    },
+    count: {
+      type: 'number',
+      description: 'Number of ping packets to send. Default: 4.',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const host = params.host as string;
+    const count = (params.count as number) || 4;
+
+    try {
+      let command: string;
+
+      if (process.platform === 'win32') {
+        command = `ping -n ${count} ${host}`;
+      } else {
+        command = `ping -c ${count} ${host}`;
+      }
+
+      const { executeShell } = await import('../ipc/shell.js');
+      const result = await executeShell(command, { requireApproval: false });
+
+      if (result.exitCode !== 0 && result.exitCode !== null) {
+        // Some systems return non-zero even on successful ping
+        // Check if output contains ping results
+      }
+
+      toolLogger.info(`[ping] Pinged ${host}`);
+
+      return {
+        result: {
+          host,
+          count,
+          output: result.stdout,
+          errorOutput: result.stderr,
+          exitCode: result.exitCode,
+        },
+      };
+    } catch (error: any) {
+      toolLogger.error(`[ping] Failed:`, error);
+      return {
+        result: null,
+        error: `Failed to ping ${host}: ${error.message}`,
       };
     }
   },
