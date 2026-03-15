@@ -63,10 +63,20 @@ export function createWorkflowVersion(
   const id = randomUUID();
   const now = Date.now();
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO workflow_versions (id, workflow_id, version, definition_json, change_description, created_at, created_by)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(id, workflowId, nextVersion, definitionJson, changeDescription || null, now, createdBy || null);
+  `
+  ).run(
+    id,
+    workflowId,
+    nextVersion,
+    definitionJson,
+    changeDescription || null,
+    now,
+    createdBy || null
+  );
 
   dbLogger.info(`[WorkflowVersion] Created version ${nextVersion} for workflow ${workflowId}`);
 
@@ -142,11 +152,13 @@ export function restoreWorkflowVersion(
 
   const now = Date.now();
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE workflows
     SET definition_json = ?, updated_at = ?
     WHERE id = ?
-  `).run(workflowVersion.definitionJson, now, workflowId);
+  `
+  ).run(workflowVersion.definitionJson, now, workflowId);
 
   dbLogger.info(`[WorkflowVersion] Restored workflow ${workflowId} to version ${version}`);
 
@@ -186,10 +198,12 @@ export function createWorkflowExecution(
   const id = randomUUID();
   const now = Date.now();
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO workflow_executions (id, workflow_id, workflow_version, status, triggered_by, trigger_source_id, input_data_json, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
+  `
+  ).run(
     id,
     workflowId,
     workflowVersion || null,
@@ -220,7 +234,12 @@ export function createWorkflowExecution(
 export function updateWorkflowExecution(
   db: Database.Database,
   executionId: string,
-  updates: Partial<Pick<WorkflowExecution, 'status' | 'startedAt' | 'completedAt' | 'durationMs' | 'outputData' | 'error' | 'nodeResults'>>
+  updates: Partial<
+    Pick<
+      WorkflowExecution,
+      'status' | 'startedAt' | 'completedAt' | 'durationMs' | 'outputData' | 'error' | 'nodeResults'
+    >
+  >
 ): WorkflowExecution {
   const setClauses: string[] = [];
   const values: any[] = [];
@@ -256,11 +275,13 @@ export function updateWorkflowExecution(
 
   values.push(executionId);
 
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE workflow_executions
     SET ${setClauses.join(', ')}
     WHERE id = ?
-  `).run(...values);
+  `
+  ).run(...values);
 
   // Get and return the updated execution
   const row = db.prepare('SELECT * FROM workflow_executions WHERE id = ?').get(executionId) as any;
@@ -321,7 +342,8 @@ export function getWorkflowExecutionStats(
   successRate: number;
 } {
   const stats = db
-    .prepare(`
+    .prepare(
+      `
       SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -330,7 +352,8 @@ export function getWorkflowExecutionStats(
         AVG(duration_ms) as avg_duration_ms
       FROM workflow_executions
       WHERE workflow_id = ?
-    `)
+    `
+    )
     .get(workflowId) as any;
 
   const successRate = stats.total > 0 ? (stats.completed / stats.total) * 100 : 0;
@@ -355,12 +378,14 @@ export function cleanupOldWorkflowVersions(
 ): number {
   // Get versions to delete (all but the most recent N)
   const versionsToDelete = db
-    .prepare(`
+    .prepare(
+      `
       SELECT id FROM workflow_versions
       WHERE workflow_id = ?
       ORDER BY version DESC
       LIMIT -1 OFFSET ?
-    `)
+    `
+    )
     .all(workflowId, keepVersions) as any[];
 
   const idsToDelete = versionsToDelete.map((v) => v.id);
@@ -368,7 +393,9 @@ export function cleanupOldWorkflowVersions(
   if (idsToDelete.length > 0) {
     const placeholders = idsToDelete.map(() => '?').join(',');
     db.prepare(`DELETE FROM workflow_versions WHERE id IN (${placeholders})`).run(...idsToDelete);
-    dbLogger.info(`[WorkflowVersion] Cleaned up ${idsToDelete.length} old versions for workflow ${workflowId}`);
+    dbLogger.info(
+      `[WorkflowVersion] Cleaned up ${idsToDelete.length} old versions for workflow ${workflowId}`
+    );
   }
 
   return idsToDelete.length;

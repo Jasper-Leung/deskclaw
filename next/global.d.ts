@@ -298,9 +298,7 @@ interface Window {
         expiredKeys: number;
         keysByCommunity: Record<string, number>;
       }>;
-      test: (
-        id: string
-      ) => Promise<{
+      test: (id: string) => Promise<{
         success: boolean;
         valid?: boolean;
         keyType?: string;

@@ -8,7 +8,10 @@ import { describe, it, expect, vi } from 'vitest';
 const mockEncoding = {
   encode: vi.fn((text: string) => {
     // Simple mock: return array of words
-    return text.split(/\s+/).filter(Boolean).map((_, i) => i);
+    return text
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((_, i) => i);
   }),
   decode: vi.fn((tokens: number[]) => {
     return tokens.join(' ');
@@ -149,9 +152,7 @@ describe('Token Counter', () => {
 
     it('should handle single message', async () => {
       const { countMessagesTokens } = await import('./token-counter.js');
-      const messages = [
-        { role: 'user' as const, content: 'Single message' },
-      ];
+      const messages = [{ role: 'user' as const, content: 'Single message' }];
       const count = countMessagesTokens(messages, 'gpt-4');
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThan(0);
@@ -161,8 +162,15 @@ describe('Token Counter', () => {
       const { countMessagesTokens } = await import('./token-counter.js');
       const messages = [
         { role: 'user' as const, content: 'What is the weather?' },
-        { role: 'assistant' as const, content: '{"tool": "web_search", "parameters": {"query": "weather"}}' },
-        { role: 'tool_result' as const, content: '{"result": "Sunny, 25°C"}', timestamp: Date.now() },
+        {
+          role: 'assistant' as const,
+          content: '{"tool": "web_search", "parameters": {"query": "weather"}}',
+        },
+        {
+          role: 'tool_result' as const,
+          content: '{"result": "Sunny, 25°C"}',
+          timestamp: Date.now(),
+        },
         { role: 'assistant' as const, content: 'The weather is sunny and 25°C.' },
       ];
       const count = countMessagesTokens(messages, 'gpt-4');
