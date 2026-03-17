@@ -57,6 +57,18 @@ DeskClaw is a desktop application that brings power of AI agents to your local m
 - **System Tray**: Background execution with quick access
 - **Modern UI**: Built with shadcn/ui and Tailwind CSS
 
+<!-- 📸 Screenshot: Browser Control -->
+<p align="center">
+  <img src="docs/screenshots/browser-control.png" alt="Browser Control" width="800"/>
+  <br>
+  <em>Browser automation with MCP integration</em>
+</p>
+
+- **MCP Browser Integration**: Control Chrome via Model Context Protocol
+- **Browser Automation**: Navigate, screenshot, click, type, and evaluate JavaScript
+- **Session Management**: Multiple browser sessions with automatic sync
+- **Infinite Scroll Support**: Handle dynamic content loading with extended timeouts
+
 <!-- 📸 Screenshot: Agent Management -->
 <p align="center">
   <img src="docs/screenshots/agents.png" alt="Agent Management" width="600"/>
@@ -117,6 +129,7 @@ DeskClaw is a desktop application that brings power of AI agents to your local m
 - **Zustand**: State management
 - **React Flow**: Workflow visual editor
 - **Vercel AI SDK**: LLM integration
+- **@modelcontextprotocol/sdk**: MCP (Model Context Protocol) integration
 - **TypeScript**: Type-safe development
 
 ## Project Structure
@@ -126,11 +139,15 @@ deskclaw/
 ├── electron/              # Electron main process
 │   ├── main/
 │   │   ├── index.ts       # Main entry point
+│   │   ├── browser/      # Browser automation
+│   │   │   ├── mcp-browser-service.ts  # MCP browser service
+│   │   │   └── ...
 │   │   ├── ipc/           # IPC handlers
 │   │   │   ├── providers.ts   # Provider management
 │   │   │   ├── models.ts      # Model management
 │   │   │   ├── llm.ts         # LLM streaming
 │   │   │   ├── shell.ts       # Shell execution with approval
+│   │   │   ├── mcp-browser.ts # MCP browser IPC handlers
 │   │   │   └── ...
 │   │   ├── db/            # Database layer
 │   │   └── tray/          # System tray
@@ -139,6 +156,7 @@ deskclaw/
 ├── next/                  # Next.js app
 │   ├── app/               # Pages
 │   │   ├── chat/          # Quick Chat with streaming
+│   │   ├── browser/       # Browser control UI
 │   │   ├── agents/        # Agent management
 │   │   ├── workflows/     # Workflow editor
 │   │   ├── memory/        # Memory vault
@@ -153,6 +171,7 @@ deskclaw/
 │   └── lib/               # Utilities & store
 ├── shared/                # Shared types
 │   └── types/
+├── scripts/               # Build and utility scripts
 └── package.json
 ```
 
@@ -199,12 +218,84 @@ Security mechanism for dangerous commands:
 - System notification alerts
 - Timeout for pending approvals
 
+### MCP Browser Integration
+
+Browser automation via Model Context Protocol:
+
+```typescript
+// Connect to MCP browser service
+await window.electronAPI.mcpBrowser.connect();
+
+// Get available Chrome tabs
+const { tabs } = await window.electronAPI.mcpBrowser.getTabs();
+
+// Navigate to URL
+await window.electronAPI.mcpBrowser.navigate('https://example.com', sessionId);
+
+// Take screenshot
+const { data } = await window.electronAPI.mcpBrowser.screenshot(sessionId);
+
+// Interact with page
+await window.electronAPI.mcpBrowser.click('buttonSelector', sessionId);
+await window.electronAPI.mcpBrowser.type('inputSelector', 'text', sessionId);
+
+// Scroll page
+await window.electronAPI.mcpBrowser.scroll(500, sessionId);
+
+// Evaluate JavaScript
+const result = await window.electronAPI.mcpBrowser.evaluate('document.title', sessionId);
+```
+
+**Features**:
+
+- Automatic session synchronization with running Chrome instances
+- Support for infinite scroll pages (e.g., Douyin, Twitter)
+- Extended timeout handling for complex pages (up to 3 minutes)
+- Visual feedback for tool execution status
+- Automatic session cleanup on disconnect
+
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 20+
 - npm or yarn
+- Chrome browser (for MCP browser automation)
+
+### MCP Browser Setup
+
+For browser automation features, you need to install [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp):
+
+```bash
+npm install -g chrome-devtools-mcp@latest
+```
+
+Then start Chrome with remote debugging enabled:
+
+**Windows**:
+
+```bash
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+```
+
+**macOS**:
+
+```bash
+/Applications/Google\Chrome.app/Contents/MacOS/Google\Chrome --remote-debugging-port=9222
+```
+
+**Linux**:
+
+```bash
+google-chrome --remote-debugging-port=9222
+```
+
+Or use the provided scripts:
+
+```bash
+npm run chrome:start    # Check Chrome status
+npm run chrome:check    # Start Chrome with debugging
+```
 
 ### Installation
 
