@@ -445,3 +445,5 @@ See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
 - Styling with [Tailwind CSS](https://tailwindcss.com/)
 - LLM integration via [Vercel AI SDK](https://sdk.vercel.ai/)
 - Workflow editor with [React Flow](https://reactflow.dev/)
+- Browser automation via [Model Context Protocol](https://modelcontextprotocol.io/) by [Anthropic](https://www.anthropic.com/)
+- Chrome DevTools integration with [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp)

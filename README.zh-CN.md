@@ -445,3 +445,5 @@ const { currentModel, setCurrentModel, theme, setTheme } = useAppStore();
 - 使用 [Tailwind CSS](https://tailwindcss.com/) 设置样式
 - 通过 [Vercel AI SDK](https://sdk.vercel.ai/) 进行 LLM 集成
 - 使用 [React Flow](https://reactflow.dev/) 制作工作流编辑器
+- 通过 [Anthropic](https://www.anthropic.com/) 的 [Model Context Protocol](https://modelcontextprotocol.io/) 实现浏览器自动化
+- 使用 [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp) 进行 Chrome DevTools 集成
