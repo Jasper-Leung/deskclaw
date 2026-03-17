@@ -5,6 +5,7 @@ import process from 'process';
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/index.js';
 import { toolLogger } from '../lib/logger.js';
+import * as monitor from './monitor.js';
 
 // Import control tools (keyboard and mouse)
 import { getTool as getControlTool, getAvailableTools as getControlTools } from './control.js';
@@ -3232,17 +3233,76 @@ export function getAvailableTools(): Record<string, Tool> {
 
 /**
  * Execute a tool by name
+ * Logs all tool executions (success and error) to the database
  */
 export async function executeTool(name: string, params: Record<string, unknown>) {
+  const startTime = Date.now();
+  const db = getDatabase();
+
   const tool = getTool(name);
   if (!tool) {
+    // Log the error for non-existent tool
+    try {
+      monitor.logToolExecution(db, {
+        toolId: name,
+        parametersJson: JSON.stringify(params),
+        resultJson: undefined,
+        errorText: `Tool "${name}" not found`,
+        executionTimeMs: Date.now() - startTime,
+        status: 'error',
+      });
+    } catch (logError) {
+      toolLogger.error(`Failed to log tool execution: ${logError}`);
+    }
+
     return {
       result: null,
       error: `Tool "${name}" not found`,
     };
   }
 
-  return await tool.handler(params);
+  try {
+    const result = await tool.handler(params);
+    const executionTime = Date.now() - startTime;
+
+    // Log successful execution
+    try {
+      monitor.logToolExecution(db, {
+        toolId: name,
+        parametersJson: JSON.stringify(params),
+        resultJson: result.result ? JSON.stringify(result.result) : undefined,
+        errorText: result.error ?? undefined,
+        executionTimeMs: executionTime,
+        status: result.error ? 'error' : 'success',
+      });
+    } catch (logError) {
+      toolLogger.error(`Failed to log tool execution: ${logError}`);
+    }
+
+    return result;
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Log error execution
+    try {
+      monitor.logToolExecution(db, {
+        toolId: name,
+        parametersJson: JSON.stringify(params),
+        resultJson: undefined,
+        errorText: errorMessage,
+        executionTimeMs: executionTime,
+        status: 'error',
+      });
+    } catch (logError) {
+      toolLogger.error(`Failed to log tool execution: ${logError}`);
+    }
+
+    return {
+      result: null,
+      error: errorMessage,
+    };
+  }
 }
 
 /**

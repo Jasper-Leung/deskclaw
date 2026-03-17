@@ -70,6 +70,11 @@ export default function BrowserPage() {
   const [typeText, setTypeText] = useState('');
   const [activeTab, setActiveTab] = useState<'control' | 'snapshot' | 'screenshot'>('control');
 
+  // MCP Browser state
+  const [mcpConnected, setMcpConnected] = useState(false);
+  const [mcpSessions, setMcpSessions] = useState<any[]>([]);
+  const [selectedMcpSession, setSelectedMcpSession] = useState<string | null>(null);
+
   // New state for browser profile creation
   const [browserType, setBrowserType] = useState<'new' | 'existing'>('new');
 
@@ -80,7 +85,37 @@ export default function BrowserPage() {
   useEffect(() => {
     loadProfiles();
     loadSessions();
+    loadMcpStatus();
   }, []);
+
+  // Load MCP browser status
+  const loadMcpStatus = async () => {
+    try {
+      if (window.electronAPI && window.electronAPI.mcpBrowser) {
+        const statusResult = await window.electronAPI.mcpBrowser.isConnected();
+        setMcpConnected(statusResult.connected);
+        if (statusResult.connected) {
+          await loadMcpSessions();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load MCP status:', error);
+    }
+  };
+
+  // Load MCP sessions
+  const loadMcpSessions = async () => {
+    try {
+      if (window.electronAPI && window.electronAPI.mcpBrowser) {
+        const result = await window.electronAPI.mcpBrowser.sessions.list();
+        if (result.success && result.sessions) {
+          setMcpSessions(result.sessions);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load MCP sessions:', error);
+    }
+  };
 
   const loadProfiles = async () => {
     try {
@@ -131,31 +166,59 @@ export default function BrowserPage() {
   };
 
   const handleNavigate = async () => {
-    if (!selectedSession || !url) return;
+    if (!url) return;
 
     try {
       if (window.electronAPI) {
-        const result = await window.electronAPI.browser.navigate(selectedSession, url);
-        if (result.success) {
-          refreshSnapshot();
-          await loadSessions();
+        let result;
+
+        // Check if MCP browser is connected and has a selected session
+        if (mcpConnected && selectedMcpSession) {
+          // Use MCP browser API
+          result = await window.electronAPI.mcpBrowser.navigate(url, selectedMcpSession);
+          if (result.success) {
+            refreshSnapshot();
+            await loadMcpSessions();
+          } else {
+            alert(result.error || 'Failed to navigate');
+            return;
+          }
+        } else if (selectedSession) {
+          // Use regular browser API
+          result = await window.electronAPI.browser.navigate(selectedSession, url);
+          if (result.success) {
+            refreshSnapshot();
+            await loadSessions();
+          } else {
+            alert(result.error || 'Failed to navigate');
+            return;
+          }
         } else {
-          alert(result.error || 'Failed to navigate');
+          alert('Please select a session first');
+          return;
         }
       }
     } catch (error) {
       console.error('Failed to navigate:', error);
+      alert(`Failed to navigate: ${error}`);
     }
   };
 
   const refreshSnapshot = async () => {
-    if (!selectedSession) return;
-
     try {
       if (window.electronAPI) {
-        const result = await window.electronAPI.browser.snapshot(selectedSession, 'ai');
-        if (result.success) {
-          setSnapshot(result.snapshot);
+        if (mcpConnected && selectedMcpSession) {
+          // Use MCP browser API
+          const result = await window.electronAPI.mcpBrowser.snapshot(selectedMcpSession);
+          if (result.success) {
+            setSnapshot(result.snapshot);
+          }
+        } else if (selectedSession) {
+          // Use regular browser API
+          const result = await window.electronAPI.browser.snapshot(selectedSession, 'ai');
+          if (result.success) {
+            setSnapshot(result.snapshot);
+          }
         }
       }
     } catch (error) {
@@ -164,11 +227,19 @@ export default function BrowserPage() {
   };
 
   const handleScreenshot = async () => {
-    if (!selectedSession) return;
-
     try {
       if (window.electronAPI) {
-        const result = await window.electronAPI.browser.screenshot(selectedSession, true);
+        let result;
+        if (mcpConnected && selectedMcpSession) {
+          // Use MCP browser API
+          result = await window.electronAPI.mcpBrowser.screenshot(selectedMcpSession);
+        } else if (selectedSession) {
+          // Use regular browser API
+          result = await window.electronAPI.browser.screenshot(selectedSession, true);
+        } else {
+          return;
+        }
+
         if (result.success) {
           setScreenshot(`data:${result.mimeType};base64,${result.data}`);
         } else {
@@ -181,11 +252,22 @@ export default function BrowserPage() {
   };
 
   const handleClick = async () => {
-    if (!selectedSession || !selector) return;
+    if (!selector) return;
 
     try {
       if (window.electronAPI) {
-        const result = await window.electronAPI.browser.click(selectedSession, selector);
+        let result;
+        if (mcpConnected && selectedMcpSession) {
+          // Use MCP browser API
+          result = await window.electronAPI.mcpBrowser.click(selector, selectedMcpSession);
+        } else if (selectedSession) {
+          // Use regular browser API
+          result = await window.electronAPI.browser.click(selectedSession, selector);
+        } else {
+          alert('Please select a session first');
+          return;
+        }
+
         if (!result.success) {
           alert(result.error || 'Failed to click element');
         }
@@ -196,11 +278,22 @@ export default function BrowserPage() {
   };
 
   const handleType = async () => {
-    if (!selectedSession || !selector || !typeText) return;
+    if (!selector || !typeText) return;
 
     try {
       if (window.electronAPI) {
-        const result = await window.electronAPI.browser.type(selectedSession, selector, typeText);
+        let result;
+        if (mcpConnected && selectedMcpSession) {
+          // Use MCP browser API
+          result = await window.electronAPI.mcpBrowser.type(selector, typeText, selectedMcpSession);
+        } else if (selectedSession) {
+          // Use regular browser API
+          result = await window.electronAPI.browser.type(selectedSession, selector, typeText);
+        } else {
+          alert('Please select a session first');
+          return;
+        }
+
         if (!result.success) {
           alert(result.error || 'Failed to type text');
         }
@@ -237,6 +330,22 @@ export default function BrowserPage() {
       }
     } catch (error) {
       console.error('Failed to close session:', error);
+    }
+  };
+
+  const handleCloseMcpSession = async (sessionId: string) => {
+    try {
+      if (window.electronAPI && window.electronAPI.mcpBrowser) {
+        await window.electronAPI.mcpBrowser.closeSession(sessionId);
+        await loadMcpSessions();
+        if (selectedMcpSession === sessionId) {
+          setSelectedMcpSession(null);
+          setSnapshot(null);
+          setScreenshot(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to close MCP session:', error);
     }
   };
 
@@ -474,7 +583,7 @@ export default function BrowserPage() {
             {/* Active Sessions */}
             {sessions.length > 0 && (
               <div className="space-y-2 pt-4 border-t">
-                <h3 className="font-semibold text-sm">Active Sessions</h3>
+                <h3 className="font-semibold text-sm">Playwright Sessions</h3>
                 {sessions.map((session) => {
                   const profile = profiles.find((p) => p.id === session.profile_id);
                   return (
@@ -487,7 +596,12 @@ export default function BrowserPage() {
                       }`}
                       onClick={() => {
                         setSelectedSession(session.id);
-                        if (session.url) setUrl(session.url);
+                        setSelectedMcpSession(null); // Clear MCP session when selecting Playwright session
+                        // Only set URL if the input field is empty or the current URL matches this session's URL
+                        // This prevents overwriting user's input when switching sessions
+                        if (!url || url === session.url) {
+                          if (session.url) setUrl(session.url);
+                        }
                         refreshSnapshot();
                       }}
                     >
@@ -513,11 +627,62 @@ export default function BrowserPage() {
                 })}
               </div>
             )}
+
+            {/* MCP Browser Sessions */}
+            {mcpConnected && mcpSessions.length > 0 && (
+              <div className="space-y-2 pt-4 border-t">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    Chrome Sessions (MCP)
+                    <Badge variant="default" className="text-xs">
+                      Connected
+                    </Badge>
+                  </h3>
+                </div>
+                {mcpSessions.map((session) => (
+                  <div
+                    key={session.id}
+                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                      selectedMcpSession === session.id
+                        ? 'bg-accent border-accent-foreground'
+                        : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => {
+                      setSelectedMcpSession(session.id);
+                      setSelectedSession(null); // Clear Playwright session when selecting MCP session
+                      // Only set URL if the input field is empty or the current URL matches this session's URL
+                      if (!url || url === session.url) {
+                        if (session.url) setUrl(session.url);
+                      }
+                      refreshSnapshot();
+                    }}
+                  >
+                    <div className="font-medium text-sm truncate">
+                      {session.title || 'Chrome Tab'}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {session.url || 'No URL'}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 h-6 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseMcpSession(session.id);
+                      }}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Control Panel */}
           <div className="lg:col-span-2 space-y-4">
-            {selectedSession ? (
+            {selectedSession || selectedMcpSession ? (
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="control">
@@ -540,6 +705,7 @@ export default function BrowserPage() {
                     <Label>Navigate to URL</Label>
                     <div className="flex gap-2">
                       <Input
+                        key={`url-input-${selectedSession || selectedMcpSession || 'none'}`}
                         value={url}
                         onChange={(e) => setUrl(e.target.value)}
                         placeholder="https://example.com"
@@ -557,6 +723,7 @@ export default function BrowserPage() {
                     <Label>Click Element</Label>
                     <div className="flex gap-2">
                       <Input
+                        key={`selector-input-${selectedSession || selectedMcpSession || 'none'}`}
                         value={selector}
                         onChange={(e) => setSelector(e.target.value)}
                         placeholder="CSS selector, e.g., button.submit"
@@ -573,12 +740,14 @@ export default function BrowserPage() {
                     <Label>Type Text</Label>
                     <div className="flex gap-2">
                       <Input
+                        key={`type-selector-input-${selectedSession || selectedMcpSession || 'none'}`}
                         value={selector}
                         onChange={(e) => setSelector(e.target.value)}
                         placeholder="CSS selector"
                         className="flex-1"
                       />
                       <Input
+                        key={`type-text-input-${selectedSession || selectedMcpSession || 'none'}`}
                         value={typeText}
                         onChange={(e) => setTypeText(e.target.value)}
                         placeholder="Text to type"
@@ -638,8 +807,35 @@ export default function BrowserPage() {
                 <Globe className="h-16 w-16 mx-auto mb-4 opacity-50" />
                 <h3 className="font-semibold mb-2">No browser session selected</h3>
                 <p className="text-sm">
-                  Launch a browser profile and select a session to control it
+                  {mcpConnected
+                    ? 'Select a Chrome session from the list to control it'
+                    : 'Launch a browser profile or connect to Chrome (MCP) to get started'}
                 </p>
+                {!mcpConnected && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={async () => {
+                      try {
+                        if (window.electronAPI && window.electronAPI.mcpBrowser) {
+                          const result = await window.electronAPI.mcpBrowser.connect();
+                          if (result.success) {
+                            await loadMcpStatus();
+                          } else {
+                            alert(result.error || 'Failed to connect to Chrome');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Failed to connect to MCP:', error);
+                        alert(`Failed to connect: ${error}`);
+                      }
+                    }}
+                  >
+                    <Link className="h-4 w-4 mr-2" />
+                    Connect to Chrome (MCP)
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -679,6 +875,7 @@ export default function BrowserPage() {
                 <Label>Navigate (Extension)</Label>
                 <div className="flex gap-2">
                   <Input
+                    key={`ext-url-input-${selectedSession}`}
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="https://example.com"
@@ -695,6 +892,7 @@ export default function BrowserPage() {
                 <Label>Click (Extension)</Label>
                 <div className="flex gap-2">
                   <Input
+                    key={`ext-selector-input-${selectedSession}`}
                     value={selector}
                     onChange={(e) => setSelector(e.target.value)}
                     placeholder="CSS selector"
@@ -710,6 +908,7 @@ export default function BrowserPage() {
                 <Label>Type (Extension)</Label>
                 <div className="flex gap-2">
                   <Input
+                    key={`ext-type-text-input-${selectedSession}`}
                     value={typeText}
                     onChange={(e) => setTypeText(e.target.value)}
                     placeholder="Text to type"
@@ -796,18 +995,17 @@ export default function BrowserPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="headless">Browser Type</Label>
+                <Label>Browser Type</Label>
                 <Select
-                  name="browserType"
                   value={browserType}
                   onValueChange={(value) => setBrowserType(value as 'new' | 'existing')}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select browser type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="new">Launch New Browser</SelectItem>
-                    <SelectItem value="existing">Connect to Existing Browser</SelectItem>
+                    <SelectItem value="new">Launch New Browser (Playwright)</SelectItem>
+                    <SelectItem value="existing">Connect to Existing Browser (CDP)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

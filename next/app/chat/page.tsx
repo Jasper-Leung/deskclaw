@@ -129,6 +129,8 @@ export default function ChatPage() {
   const [showToolDialog, setShowToolDialog] = useState(false);
   const [selectedToolForDialog, setSelectedToolForDialog] = useState<Tool | null>(null);
   const [toolParams, setToolParams] = useState<Record<string, string>>({});
+  // Track currently executing tools for loading indicator
+  const [executingTools, setExecutingTools] = useState<Set<string>>(new Set());
   // Quick Chat state
   const [quickChatAgent, setQuickChatAgent] = useState<{ id: string; name: string } | null>(null);
   const [quickChatSelectedTools, setQuickChatSelectedTools] = useState<Set<string>>(new Set());
@@ -1502,14 +1504,24 @@ export default function ChatPage() {
   };
 
   const loadSession = async (sessionId: string) => {
+    // Set loading flag to prevent auto-save during session switch
+    isLoadingSessionRef.current = true;
+
     try {
       if (window.electronAPI) {
         const session = await window.electronAPI.sessions.get(sessionId);
         setMessages(session.messagesJson || []);
         setCurrentSessionId(sessionId);
+
+        // Reset loading flag after a delay to ensure state updates have propagated
+        setTimeout(() => {
+          isLoadingSessionRef.current = false;
+        }, 100);
       }
     } catch (error) {
       console.error('Failed to load session:', error);
+      // Reset loading flag on error
+      isLoadingSessionRef.current = false;
     }
   };
 
@@ -1527,6 +1539,9 @@ export default function ChatPage() {
   }, [loadSession]);
 
   const createNewSession = async () => {
+    // Set loading flag to prevent auto-save during session switch
+    isLoadingSessionRef.current = true;
+
     try {
       if (window.electronAPI) {
         const session = await window.electronAPI.sessions.create({
@@ -1536,9 +1551,16 @@ export default function ChatPage() {
         setCurrentSessionId(session.id);
         setMessages([]);
         await loadSessions();
+
+        // Reset loading flag after a delay to ensure state updates have propagated
+        setTimeout(() => {
+          isLoadingSessionRef.current = false;
+        }, 100);
       }
     } catch (error) {
       console.error('Failed to create session:', error);
+      // Reset loading flag on error
+      isLoadingSessionRef.current = false;
     }
   };
 
@@ -1706,6 +1728,34 @@ export default function ChatPage() {
     [currentSessionId]
   );
 
+  // Track if we're loading a session to prevent saving during session switch
+  const isLoadingSessionRef = useRef(false);
+
+  // Auto-save messages whenever they change
+  // This ensures all messages (including stream responses, tool calls, errors) are persisted
+  // preventing data loss when switching conversations or restarting the app
+  const isInitialLoadRef = useRef(true);
+  useEffect(() => {
+    // Skip saving during initial load to avoid overwriting existing session data
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    // Skip saving if we're in the middle of loading a session
+    // This prevents saving messages to the wrong session during session switches
+    if (isLoadingSessionRef.current) {
+      return;
+    }
+
+    // Only save if we have a current session and there are messages
+    if (currentSessionId && messages.length > 0) {
+      saveMessages(messages).catch((error) => {
+        console.error('Failed to auto-save messages:', error);
+      });
+    }
+  }, [messages, currentSessionId, saveMessages]);
+
   const handleSend = async () => {
     if (!input.trim() || isLoading || !selectedModel) return;
 
@@ -1818,6 +1868,22 @@ export default function ChatPage() {
     userMessageObj: Message,
     visibleMessages: Message[]
   ) => {
+    // Create session if needed
+    if (!currentSessionId) {
+      try {
+        if (window.electronAPI) {
+          const session = await window.electronAPI.sessions.create({
+            title: userMessage.slice(0, 50),
+            messages: visibleMessages,
+          });
+          setCurrentSessionId(session.id);
+          await loadSessions();
+        }
+      } catch (error) {
+        console.error('Failed to create session:', error);
+      }
+    }
+
     // Messages for LLM (including tools system message if tools enabled)
     // Apply context control to prevent token overflow
     let llmMessages = truncateMessagesForLLM([...messages, userMessageObj], 80000);
@@ -1955,11 +2021,15 @@ export default function ChatPage() {
   };
 
   const executeTool = async (toolName: string, parameters: Record<string, unknown>) => {
-    // Add tool call message
+    // Add tool to executing set for loading indicator
+    setExecutingTools((prev) => new Set(prev).add(toolName));
+
+    // Add tool call message with execution timestamp
+    const executionStartTime = Date.now();
     const toolMessage: Message = {
       role: 'tool',
-      content: `Calling ${toolName} with ${JSON.stringify(parameters)}`,
-      timestamp: Date.now(),
+      content: `⏳ Calling ${toolName} with ${JSON.stringify(parameters)}`,
+      timestamp: executionStartTime,
       toolName,
     };
     setMessages((prev) => [...prev, toolMessage]);
@@ -1967,11 +2037,12 @@ export default function ChatPage() {
     try {
       if (window.electronAPI) {
         const result = await window.electronAPI.tools.execute(toolName, parameters);
+        const executionTime = Date.now() - executionStartTime;
 
         if (result.error) {
           const errorMessage: Message = {
             role: 'tool_error',
-            content: `Error in ${toolName}: ${result.error}`,
+            content: `❌ Error in ${toolName} (after ${executionTime}ms):\n\n${result.error}`,
             timestamp: Date.now(),
             toolName,
           };
@@ -1979,7 +2050,7 @@ export default function ChatPage() {
         } else {
           const successMessage: Message = {
             role: 'tool_result',
-            content: `${toolName} result:\n${JSON.stringify(result.result, null, 2)}`,
+            content: `✅ ${toolName} completed (${executionTime}ms):\n\n${JSON.stringify(result.result, null, 2)}`,
             timestamp: Date.now(),
             toolName,
           };
@@ -1992,13 +2063,21 @@ export default function ChatPage() {
         }
       }
     } catch (error: any) {
+      const executionTime = Date.now() - executionStartTime;
       const errorMessage: Message = {
         role: 'tool_error',
-        content: `Failed to execute ${toolName}: ${error.message}`,
+        content: `❌ Failed to execute ${toolName} (after ${executionTime}ms):\n\n${error.message}`,
         timestamp: Date.now(),
         toolName,
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      // Remove tool from executing set
+      setExecutingTools((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(toolName);
+        return newSet;
+      });
     }
   };
 
@@ -2009,11 +2088,15 @@ export default function ChatPage() {
   ) => {
     console.log('executeToolAsync called:', { toolName, parameters });
 
-    // Add tool call message
+    // Add tool to executing set for loading indicator
+    setExecutingTools((prev) => new Set(prev).add(toolName));
+
+    // Add tool call message with execution timestamp
+    const executionStartTime = Date.now();
     const toolMessage: Message = {
       role: 'tool',
-      content: `Calling ${toolName} with ${JSON.stringify(parameters)}`,
-      timestamp: Date.now(),
+      content: `⏳ Calling ${toolName} with ${JSON.stringify(parameters)}`,
+      timestamp: executionStartTime,
       toolName,
     };
     const messagesWithTool = [...currentMessages, toolMessage];
@@ -2025,22 +2108,28 @@ export default function ChatPage() {
 
         const result = await window.electronAPI.tools.execute(toolName, parameters);
         console.log('Tool execution result:', result);
+        const executionTime = Date.now() - executionStartTime;
 
         let resultMessage: Message;
         if (result.error) {
-          // Provide helpful error message with suggestions
-          let errorContent = `Error in ${toolName}: ${result.error}\n\n`;
+          // Provide helpful error message with suggestions and execution time
+          let errorContent = `❌ Error in ${toolName} (after ${executionTime}ms):\n\n${result.error}\n\n`;
 
           // Add helpful suggestions based on the error
           if (result.error.includes('not found')) {
-            errorContent += `Available tools: file_read, file_write, file_list, execute_command, web_search, http_request, get_time, set_work_directory, get_work_directory, scheduled_create, scheduled_list, scheduled_delete, scheduled_update, stock_quote\n`;
+            errorContent += `💡 Suggestion: Available tools: file_read, file_write, file_list, execute_command, web_search, http_request, get_time, set_work_directory, get_work_directory, scheduled_create, scheduled_list, scheduled_delete, scheduled_update, stock_quote\n`;
             errorContent += `Please check the tool name and try again with the correct name.`;
           } else if (result.error.includes('Directory does not exist')) {
-            errorContent += `Suggestion: Use execute_command with "mkdir <directory>" to create the directory first, or use an existing directory.`;
+            errorContent += `💡 Suggestion: Use execute_command with "mkdir <directory>" to create the directory first.`;
           } else if (result.error.includes('Failed to read file')) {
-            errorContent += `Suggestion: Check if the file path is correct. Use file_list to see available files.`;
+            errorContent += `💡 Suggestion: Check if the file path is correct. Use file_list to see available files.`;
           } else if (result.error.includes('Failed to write file')) {
-            errorContent += `Suggestion: Make sure the parent directory exists. Use execute_command with "mkdir" to create directories.`;
+            errorContent += `💡 Suggestion: Make sure the parent directory exists. Use execute_command with "mkdir" to create directories.`;
+          } else if (result.error.includes('timeout') || result.error.includes('Timeout')) {
+            errorContent += `💡 Suggestion: The operation took too long. Try:\n`;
+            errorContent += `- Using smaller datasets/parameters\n`;
+            errorContent += `- Breaking the operation into smaller steps\n`;
+            errorContent += `- Checking if the target service is responding`;
           }
 
           resultMessage = {
@@ -2050,16 +2139,16 @@ export default function ChatPage() {
             toolName,
           };
         } else {
-          // Format result with length control
+          // Format result with length control and execution time
           let resultContent = '';
           const resultStr = JSON.stringify(result.result, null, 2);
 
           // Limit result display to prevent UI issues
           const maxDisplayLength = 50000; // 50KB for display
           if (resultStr.length > maxDisplayLength) {
-            resultContent = `Tool result (truncated, ${resultStr.length} chars total):\n${resultStr.substring(0, maxDisplayLength)}\n\n... (${resultStr.length - maxDisplayLength} more characters)`;
+            resultContent = `✅ Tool result (truncated, ${resultStr.length} chars total, ${executionTime}ms):\n${resultStr.substring(0, maxDisplayLength)}\n\n... (${resultStr.length - maxDisplayLength} more characters)`;
           } else {
-            resultContent = `Tool result:\n${resultStr}`;
+            resultContent = `✅ Tool result (${executionTime}ms):\n${resultStr}`;
           }
 
           resultMessage = {
@@ -2240,13 +2329,21 @@ export default function ChatPage() {
       }
     } catch (error: any) {
       console.error('Error in executeToolAsync:', error);
+      const executionTime = Date.now() - executionStartTime;
       const errorMessage: Message = {
         role: 'tool_error',
-        content: `Failed to execute ${toolName}: ${error.message}`,
+        content: `❌ Failed to execute ${toolName} (after ${executionTime}ms):\n\n${error.message}`,
         timestamp: Date.now(),
         toolName,
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      // Remove tool from executing set
+      setExecutingTools((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(toolName);
+        return newSet;
+      });
     }
   };
 
@@ -2696,17 +2793,42 @@ export default function ChatPage() {
 
                       // Tool messages
                       if (message.role === 'tool') {
+                        const isExecuting = executingTools.has(message.toolName || '');
                         return (
                           <div key={index} className="flex justify-start">
-                            <div className="max-w-[80%] rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 p-2">
-                              <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                                <Wrench className="h-3 w-3" />
-                                <span className="text-xs font-medium">Tool Call</span>
+                            <div
+                              className={`max-w-[80%] rounded-lg border p-2 ${
+                                isExecuting
+                                  ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 animate-pulse'
+                                  : 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+                              }`}
+                            >
+                              <div
+                                className={`flex items-center gap-2 ${
+                                  isExecuting
+                                    ? 'text-yellow-700 dark:text-yellow-300'
+                                    : 'text-purple-700 dark:text-purple-300'
+                                }`}
+                              >
+                                {isExecuting ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Wrench className="h-3 w-3" />
+                                )}
+                                <span className="text-xs font-medium">
+                                  {isExecuting ? 'Executing' : 'Tool Call'}
+                                </span>
                                 <span className="text-xs">•</span>
                                 <span className="text-xs">{message.toolName}</span>
                               </div>
                               <ScrollArea className="max-h-[100px] mt-1">
-                                <p className="text-xs text-purple-600 dark:text-purple-400 px-1">
+                                <p
+                                  className={`text-xs px-1 ${
+                                    isExecuting
+                                      ? 'text-yellow-600 dark:text-yellow-400'
+                                      : 'text-purple-600 dark:text-purple-400'
+                                  }`}
+                                >
                                   {message.content}
                                 </p>
                               </ScrollArea>

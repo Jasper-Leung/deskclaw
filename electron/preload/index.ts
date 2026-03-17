@@ -397,6 +397,7 @@ const electronAPI = {
         headless?: boolean;
         viewportWidth?: number;
         viewportHeight?: number;
+        cdpEndpoint?: string;
       }) => ipcRenderer.invoke('browser:profiles:create' as IPCChannel, data),
       delete: (id: string) => ipcRenderer.invoke('browser:profiles:delete' as IPCChannel, id),
     },
@@ -417,6 +418,50 @@ const electronAPI = {
       ipcRenderer.invoke('browser:screenshot' as IPCChannel, sessionId, fullPage),
     closeSession: (sessionId: string) =>
       ipcRenderer.invoke('browser:closeSession' as IPCChannel, sessionId),
+    sessions: {
+      list: () => ipcRenderer.invoke('browser:sessions:list' as IPCChannel),
+    },
+    stats: () => ipcRenderer.invoke('browser:stats' as IPCChannel),
+  },
+
+  // MCP Browser (chrome-devtools-mcp integration)
+  mcpBrowser: {
+    connect: () => ipcRenderer.invoke('mcpBrowser:connect' as IPCChannel),
+    disconnect: () => ipcRenderer.invoke('mcpBrowser:disconnect' as IPCChannel),
+    isConnected: () => ipcRenderer.invoke('mcpBrowser:isConnected' as IPCChannel),
+    getTabs: () => ipcRenderer.invoke('mcpBrowser:getTabs' as IPCChannel),
+    sessions: {
+      list: () => ipcRenderer.invoke('mcpBrowser:sessions:list' as IPCChannel),
+      setCurrent: (sessionId: string) =>
+        ipcRenderer.invoke('mcpBrowser:sessions:setCurrent' as IPCChannel, sessionId),
+      getCurrent: () => ipcRenderer.invoke('mcpBrowser:sessions:getCurrent' as IPCChannel),
+    },
+    navigate: (url: string, sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:navigate' as IPCChannel, url, sessionId),
+    screenshot: (sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:screenshot' as IPCChannel, sessionId),
+    snapshot: (sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:snapshot' as IPCChannel, sessionId),
+    click: (selector: string, sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:click' as IPCChannel, selector, sessionId),
+    type: (selector: string, text: string, sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:type' as IPCChannel, selector, text, sessionId),
+    closeSession: (sessionId: string) =>
+      ipcRenderer.invoke('mcpBrowser:closeSession' as IPCChannel, sessionId),
+    stats: () => ipcRenderer.invoke('mcpBrowser:stats' as IPCChannel),
+    scroll: (pixels: number, sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:scroll' as IPCChannel, pixels, sessionId),
+    scrollToEnd: (maxScrolls: number, sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:scrollToEnd' as IPCChannel, maxScrolls, sessionId),
+    evaluate: (expression: string, sessionId?: string) =>
+      ipcRenderer.invoke('mcpBrowser:evaluate' as IPCChannel, expression, sessionId),
+    waitForSelector: (selector: string, timeoutMs: number, sessionId?: string) =>
+      ipcRenderer.invoke(
+        'mcpBrowser:waitForSelector' as IPCChannel,
+        selector,
+        timeoutMs,
+        sessionId
+      ),
   },
 
   // Extension Bridge

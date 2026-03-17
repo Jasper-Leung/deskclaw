@@ -17,6 +17,9 @@
     "build:next": "cd next && next build",
     "build:electron": "node build-electron.js",
     "build": "npm run build:electron && npx rimraf next/.next && cd next && npx next build",
+    "build:portable": "node scripts/build-portable.js",
+    "build:portable:bat": "scripts\\build-portable.bat",
+    "build:portable:dir": "npm run build && electron-builder --win --x64 --dir",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -25,7 +28,10 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "chrome:check": "node scripts/check-chrome-debug.js",
+    "chrome:start": "node scripts/start-chrome-debug.js",
+    "chrome:start:bat": "scripts\\start-chrome-debug.bat"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.1.9",
@@ -129,8 +135,30 @@
       "node_modules/**/*"
     ],
     "win": {
-      "target": "nsis",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "next/public/icon.ico"
+    },
+    "portable": {
+      "artifactName": "DeskClaw-${version}-portable.exe"
     },
     "mac": {
       "target": "dmg",

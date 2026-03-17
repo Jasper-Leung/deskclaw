@@ -5,7 +5,6 @@
  */
 
 import { ipcMain } from 'electron';
-import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/index.js';
 import { browserService } from '../browser/browser-service.js';
 

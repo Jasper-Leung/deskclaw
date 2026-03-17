@@ -211,7 +211,28 @@ export type IPCChannel =
   | 'browser:type'
   | 'browser:evaluate'
   | 'browser:screenshot'
-  | 'browser:closeSession';
+  | 'browser:closeSession'
+  | 'browser:sessions:list'
+  | 'browser:stats'
+  // MCP Browser
+  | 'mcpBrowser:connect'
+  | 'mcpBrowser:disconnect'
+  | 'mcpBrowser:isConnected'
+  | 'mcpBrowser:getTabs'
+  | 'mcpBrowser:sessions:list'
+  | 'mcpBrowser:sessions:setCurrent'
+  | 'mcpBrowser:sessions:getCurrent'
+  | 'mcpBrowser:navigate'
+  | 'mcpBrowser:screenshot'
+  | 'mcpBrowser:snapshot'
+  | 'mcpBrowser:click'
+  | 'mcpBrowser:type'
+  | 'mcpBrowser:closeSession'
+  | 'mcpBrowser:stats'
+  | 'mcpBrowser:scroll'
+  | 'mcpBrowser:scrollToEnd'
+  | 'mcpBrowser:evaluate'
+  | 'mcpBrowser:waitForSelector';
 
 export interface LLMRequest {
   model: string;

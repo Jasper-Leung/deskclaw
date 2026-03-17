@@ -8,7 +8,6 @@
 // Import using default import for CommonJS compatibility
 import nut from '@nut-tree/nut-js';
 import { toolLogger } from '../lib/logger.js';
-import { readFileSync } from 'fs';
 
 // Destructure for convenience
 const { mouse, keyboard, screen, Key, Point, Region, Button, sleep, up, down, left, right } = nut;
@@ -24,13 +23,6 @@ let lastScreenshot: {
   height: number;
   timestamp: number;
 } | null = null;
-
-/**
- * Generate a random number within a range
- */
-function randomInRange(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
-}
 
 /**
  * Ease-in-out cubic function for natural acceleration/deceleration
@@ -1110,12 +1102,6 @@ tools.screenshot_diff = {
   description:
     'Capture a screenshot only if the screen has changed significantly from the last screenshot. Saves context tokens by avoiding duplicate screenshots. Returns null if no significant change detected.',
   parameters: {
-    threshold: {
-      type: 'number',
-      description:
-        'Change threshold (0-1). Lower = more sensitive to changes. Default: 0.05 (5% pixel change). Use 0.02 for very sensitive, 0.1 for less sensitive.',
-      required: false,
-    },
     mode: {
       type: 'string',
       description:
@@ -1131,7 +1117,6 @@ tools.screenshot_diff = {
   },
   handler: async (params) => {
     try {
-      const threshold = (params.threshold as number) || 0.05;
       const mode = (params.mode as string) || 'smart';
       const force = params.force as boolean | undefined;
 
@@ -1344,14 +1329,6 @@ interface SequenceStep {
   delay?: number; // Delay after this step (ms)
   delayVariation?: number; // Random variation for delay (ms)
   description?: string; // Optional description for logging
-}
-
-interface SequenceExecuteParams {
-  steps: SequenceStep[];
-  onError?: 'stop' | 'continue' | 'retry';
-  maxRetries?: number;
-  defaultDelay?: number;
-  defaultVariation?: number;
 }
 
 /**

@@ -67,10 +67,11 @@ function calculateContextUsage(
     totalTokens = messages.reduce((sum, msg) => sum + estimateTokensFallback(msg), 0);
   }
 
-  // Use whichever limit is hit first
+  // Use token-based percentage (primary metric)
+  // Char-based percentage is only for reference/warning
   const tokenPercentage = (totalTokens / maxTokens) * 100;
   const charPercentage = (totalChars / maxChars) * 100;
-  const percentage = Math.max(tokenPercentage, charPercentage);
+  const percentage = tokenPercentage; // Use only token percentage
 
   // Determine status color
   let status: 'safe' | 'warning' | 'danger' = 'safe';

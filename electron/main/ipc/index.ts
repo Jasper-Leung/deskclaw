@@ -19,6 +19,7 @@ import * as toolsHandlers from './tools.js';
 import * as workflowsAutoHandlers from './workflows-auto.js';
 import * as channelsHandlers from './channels.js';
 import * as browserHandlers from './browser.js';
+import * as mcpBrowserHandlers from './mcp-browser.js';
 import * as extensionBridgeHandlers from './extension-bridge.js';
 import * as quickChatHandlers from './quick-chat.js';
 import * as tokensHandlers from './tokens.js';
@@ -374,6 +375,9 @@ export const registerIPCHandlers = (): void => {
 
   // Browser
   browserHandlers.registerBrowserHandlers();
+
+  // MCP Browser
+  mcpBrowserHandlers.registerMCPBrowserHandlers();
 
   // Extension Bridge
   extensionBridgeHandlers.registerExtensionBridgeHandlers();

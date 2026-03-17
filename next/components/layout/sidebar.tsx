@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -35,7 +36,29 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { sidebarOpen, setSidebarOpen, sidebarCollapsed, toggleSidebarCollapsed } = useAppStore();
+  const {
+    sidebarOpen,
+    setSidebarOpen,
+    sidebarCollapsed,
+    toggleSidebarCollapsed,
+    setSidebarCollapsed,
+  } = useAppStore();
+
+  // Auto-expand sidebar when window is resized to large size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024 && sidebarCollapsed) {
+        // Auto-expand on large screens
+        setSidebarCollapsed(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    // Check on mount
+    handleResize();
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarCollapsed, setSidebarCollapsed]);
 
   return (
     <>
@@ -65,14 +88,31 @@ export function Sidebar() {
               </div>
               {!sidebarCollapsed && <span className="font-semibold">DeskClaw</span>}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {/* Collapse/Expand button - always visible on desktop */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden lg:flex"
+                onClick={toggleSidebarCollapsed}
+                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {sidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4" />
+                )}
+              </Button>
+              {/* Mobile close button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -121,23 +161,6 @@ export function Sidebar() {
           </div>
         </div>
       </aside>
-
-      {/* Collapse button (desktop only) */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className={cn(
-          'fixed top-1/2 z-50 hidden lg:flex -translate-y-1/2 transition-all duration-200',
-          sidebarCollapsed ? 'left-16' : 'left-64'
-        )}
-        onClick={toggleSidebarCollapsed}
-      >
-        {sidebarCollapsed ? (
-          <ChevronRight className="h-4 w-4" />
-        ) : (
-          <ChevronLeft className="h-4 w-4" />
-        )}
-      </Button>
     </>
   );
 }
