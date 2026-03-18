@@ -68,9 +68,7 @@ function calculateContextUsage(
   }
 
   // Use token-based percentage (primary metric)
-  // Char-based percentage is only for reference/warning
   const tokenPercentage = (totalTokens / maxTokens) * 100;
-  const charPercentage = (totalChars / maxChars) * 100;
   const percentage = tokenPercentage; // Use only token percentage
 
   // Determine status color

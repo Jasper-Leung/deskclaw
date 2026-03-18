@@ -35,6 +35,9 @@ import {
   Link,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('browser-page');
 
 interface BrowserProfile {
   id: string;
@@ -99,7 +102,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to load MCP status:', error);
+      logger.error({ error }, 'Failed to load MCP status');
     }
   };
 
@@ -113,7 +116,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to load MCP sessions:', error);
+      logger.error({ error }, 'Failed to load MCP sessions');
     }
   };
 
@@ -124,7 +127,7 @@ export default function BrowserPage() {
         setProfiles(data);
       }
     } catch (error) {
-      console.error('Failed to load profiles:', error);
+      logger.error({ error }, 'Failed to load profiles');
     }
   };
 
@@ -135,7 +138,7 @@ export default function BrowserPage() {
         setSessions(data);
       }
     } catch (error) {
-      console.error('Failed to load sessions:', error);
+      logger.error({ error }, 'Failed to load sessions');
     }
   };
 
@@ -150,7 +153,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to launch browser:', error);
+      logger.error({ error }, 'Failed to launch browser');
     }
   };
 
@@ -161,7 +164,7 @@ export default function BrowserPage() {
         await loadSessions();
       }
     } catch (error) {
-      console.error('Failed to close browser:', error);
+      logger.error({ error }, 'Failed to close browser');
     }
   };
 
@@ -199,7 +202,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to navigate:', error);
+      logger.error({ error }, 'Failed to navigate');
       alert(`Failed to navigate: ${error}`);
     }
   };
@@ -222,7 +225,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to get snapshot:', error);
+      logger.error({ error }, 'Failed to get snapshot');
     }
   };
 
@@ -247,7 +250,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to take screenshot:', error);
+      logger.error({ error }, 'Failed to take screenshot');
     }
   };
 
@@ -273,7 +276,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to click:', error);
+      logger.error({ error }, 'Failed to click');
     }
   };
 
@@ -299,7 +302,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to type:', error);
+      logger.error({ error }, 'Failed to type');
     }
   };
 
@@ -313,7 +316,7 @@ export default function BrowserPage() {
         await loadSessions();
       }
     } catch (error) {
-      console.error('Failed to delete profile:', error);
+      logger.error({ error }, 'Failed to delete profile');
     }
   };
 
@@ -329,7 +332,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to close session:', error);
+      logger.error({ error }, 'Failed to close session');
     }
   };
 
@@ -345,7 +348,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to close MCP session:', error);
+      logger.error({ error }, 'Failed to close MCP session');
     }
   };
 
@@ -358,7 +361,7 @@ export default function BrowserPage() {
         setExtensionCount(status.extensions || 0);
       }
     } catch (error) {
-      console.error('Failed to check extension bridge status:', error);
+      logger.error({ error }, 'Failed to check extension bridge status');
     }
   };
 
@@ -379,7 +382,7 @@ export default function BrowserPage() {
         alert('Extension Bridge API not available. Please check if you are running in Electron.');
       }
     } catch (error) {
-      console.error('Failed to start extension bridge:', error);
+      logger.error({ error }, 'Failed to start extension bridge');
     }
   };
 
@@ -397,7 +400,7 @@ export default function BrowserPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to stop extension bridge:', error);
+      logger.error({ error }, 'Failed to stop extension bridge');
     }
   };
 
@@ -413,7 +416,7 @@ export default function BrowserPage() {
         alert('Extension Bridge not available');
       }
     } catch (error) {
-      console.error('Failed to navigate:', error);
+      logger.error({ error }, 'Failed to navigate');
     }
   };
 
@@ -426,7 +429,7 @@ export default function BrowserPage() {
         alert('Extension Bridge not available');
       }
     } catch (error) {
-      console.error('Failed to get snapshot:', error);
+      logger.error({ error }, 'Failed to get snapshot');
     }
   };
 
@@ -441,7 +444,7 @@ export default function BrowserPage() {
         alert('Extension Bridge not available');
       }
     } catch (error) {
-      console.error('Failed to click:', error);
+      logger.error({ error }, 'Failed to click');
     }
   };
 
@@ -456,7 +459,7 @@ export default function BrowserPage() {
         alert('Extension Bridge not available');
       }
     } catch (error) {
-      console.error('Failed to type:', error);
+      logger.error({ error }, 'Failed to type');
     }
   };
 
@@ -476,7 +479,7 @@ export default function BrowserPage() {
         alert('Extension Bridge not available');
       }
     } catch (error) {
-      console.error('Failed to take screenshot:', error);
+      logger.error({ error }, 'Failed to take screenshot');
     }
   };
 
@@ -827,7 +830,7 @@ export default function BrowserPage() {
                           }
                         }
                       } catch (error) {
-                        console.error('Failed to connect to MCP:', error);
+                        logger.error({ error }, 'Failed to connect to MCP');
                         alert(`Failed to connect: ${error}`);
                       }
                     }}
@@ -984,7 +987,7 @@ export default function BrowserPage() {
                     setBrowserType('new');
                   }
                 } catch (error) {
-                  console.error('Failed to create profile:', error);
+                  logger.error({ error }, 'Failed to create profile');
                 }
               }}
               className="space-y-4"

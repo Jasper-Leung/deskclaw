@@ -20,7 +20,7 @@ vi.mock('pino', () => {
       return this;
     }),
   });
-  const pinoMock = vi.fn(createLogger);
+  const pinoMock = vi.fn(createLogger) as any;
   pinoMock.stdTimeFunctions = {
     isoTime: vi.fn(() => ''),
   };
@@ -32,6 +32,7 @@ import { logger, createLogger } from './logger';
 describe('Next.js Logger', () => {
   beforeEach(() => {
     // Reset environment before each test
+    // @ts-expect-error - NODE_ENV is read-only but we need to set it for tests
     process.env.NODE_ENV = 'test';
     delete process.env.NEXT_PUBLIC_LOG_LEVEL;
     delete process.env.LOG_LEVEL;
@@ -80,12 +81,14 @@ describe('Next.js Logger', () => {
 
   describe('log levels', () => {
     it('should use debug level in development', () => {
+      // @ts-expect-error - NODE_ENV is read-only but we need to set it for tests
       process.env.NODE_ENV = 'development';
       const testLogger = createLogger('test');
       expect(testLogger.level).toBeDefined();
     });
 
     it('should use warn level in production', () => {
+      // @ts-expect-error - NODE_ENV is read-only but we need to set it for tests
       process.env.NODE_ENV = 'production';
       const testLogger = createLogger('test');
       expect(testLogger.level).toBeDefined();

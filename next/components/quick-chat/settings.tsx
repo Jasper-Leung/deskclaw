@@ -44,12 +44,22 @@ import {
   Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('quick-chat-settings');
 
 interface Agent {
   id: string;
   name: string;
-  description: string | null;
-  memoryCount: number;
+  description?: string;
+  systemPrompt?: string;
+  temperature?: number;
+  memoryCount?: number;
+}
+
+interface ToolDefinition {
+  description?: string;
+  parameters?: Record<string, unknown>;
 }
 
 interface QuickChatSettingsData {
@@ -75,8 +85,13 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
   const [isSaving, setIsSaving] = useState(false);
   const [availableAgents, setAvailableAgents] = useState<Agent[]>([]);
   const [currentConfig, setCurrentConfig] = useState<{
-    agentInfo: any;
-    memoryStats: any;
+    agentInfo: Agent | null;
+    memoryStats: {
+      totalMemories: number;
+      avgImportance: number;
+      oldestMemory?: number;
+      newestMemory?: number;
+    } | null;
   } | null>(null);
 
   // Memory management state
@@ -138,11 +153,13 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
       setCurrentConfig(configResult);
 
       // Load tools
-      const toolsArray = Object.entries(toolsResult || {}).map(([name, tool]: [string, any]) => ({
-        name,
-        description: tool.description || '',
-        parameters: tool.parameters || {},
-      }));
+      const toolsArray = Object.entries(toolsResult || {}).map(
+        ([name, tool]: [string, ToolDefinition]) => ({
+          name,
+          description: tool.description || '',
+          parameters: tool.parameters || {},
+        })
+      );
       setAvailableTools(toolsArray);
       // Load saved tool selection, or default to all tools
       const savedTools = settingsResult.selectedTools as string[] | undefined;
@@ -153,8 +170,9 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
       } else {
         setSelectedTools(new Set(toolsArray.map((t) => t.name)));
       }
-    } catch (error: any) {
-      toast.error('Failed to load settings: ' + error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to load settings: ' + message);
     } finally {
       setIsLoading(false);
     }
@@ -176,8 +194,9 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
       setOpen(false);
       onSettingsChange?.();
       loadData(); // Reload to get latest config
-    } catch (error: any) {
-      toast.error('Failed to save settings: ' + error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to save settings: ' + message);
     } finally {
       setIsSaving(false);
     }
@@ -192,8 +211,9 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
       await window.electronAPI.quickChat.resetSettings();
       toast.success('Settings reset');
       loadData();
-    } catch (error: any) {
-      toast.error('Failed to reset settings: ' + error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to reset settings: ' + message);
     }
   };
 
@@ -209,8 +229,9 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
       // Async save to backend
       await window.electronAPI.quickChat.setAgent(newAgentId);
       loadMemories(newAgentId || undefined); // Load this agent's memories
-    } catch (error: any) {
-      toast.error('Failed to set agent: ' + error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to set agent: ' + message);
       // If failed, reload original state
       loadData();
     }
@@ -229,7 +250,7 @@ export function QuickChatSettings({ trigger, onSettingsChange }: QuickChatSettin
       const result = await window.electronAPI.memory.getAgentMemories(targetAgentId, 50);
       setMemories(result || []);
     } catch (error: any) {
-      console.error('Failed to load memories:', error);
+      logger.error({ error }, 'Failed to load memories');
       setMemories([]);
     }
   };
@@ -846,7 +867,7 @@ export function QuickChatAgentSelector({
       setAgents(agentsResult);
       setCurrentAgentId(settingsResult.agentId || null);
     } catch (error: any) {
-      console.error('Failed to load agents:', error);
+      logger.error({ error }, 'Failed to load agents');
     } finally {
       setIsLoading(false);
     }

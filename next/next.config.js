@@ -66,14 +66,13 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
 
-  // Disable ESLint during build
+  // ESLint and TypeScript checks enabled for production builds
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
 
-  // Disable TypeScript errors during build
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
 
   // Experimental features

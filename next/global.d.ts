@@ -1,7 +1,8 @@
 // Global type declarations for DeskClaw
 
 interface Window {
-  electronAPI?: {
+  electronAPI: {
+    onNavigate?: (callback: (route: string) => void) => void;
     providers: {
       list: () => Promise<any[]>;
       create: (data: any) => Promise<any>;
@@ -40,6 +41,9 @@ interface Window {
       verify: () => Promise<any>;
       autoExecute: (request: any) => Promise<any>;
       autoPreview: (userMessage: string) => Promise<any>;
+      generate: (description: string, modelId: string) => Promise<any>;
+      explain: (workflow: any, modelId: string) => Promise<any>;
+      saveGenerated: (workflow: any) => Promise<any>;
       onMatched: (callback: (match: any) => void) => () => void;
       onProgress: (callback: (update: any) => void) => () => void;
       onOutput: (callback: (output: any) => void) => () => void;
@@ -67,7 +71,8 @@ interface Window {
       execute: (command: string, options?: any) => Promise<any>;
       approve: (approvalId: string) => Promise<void>;
       reject: (approvalId: string) => Promise<void>;
-      onApprovalRequest: (callback: (request: any) => void) => () => void;
+      onApprovalRequest: (callback: (_event: any, request: any) => void) => () => void;
+      onOutput: (callback: (output: any) => void) => () => void;
     };
     llm: {
       chat: (request: any) => Promise<any>;
@@ -196,9 +201,44 @@ interface Window {
       evaluate: (sessionId: string, fn: string) => Promise<any>;
       screenshot: (sessionId: string, fullPage?: boolean) => Promise<any>;
       closeSession: (sessionId: string) => Promise<any>;
-      sessions?: {
+      sessions: {
         list: () => Promise<any[]>;
       };
+      stats: () => Promise<any>;
+    };
+    // MCP Browser (chrome-devtools-mcp integration)
+    mcpBrowser: {
+      connect: () => Promise<{ success: boolean; error?: string }>;
+      disconnect: () => Promise<{ success: boolean; error?: string }>;
+      isConnected: () => Promise<{ connected: boolean }>;
+      getTabs: () => Promise<{ success: boolean; tabs?: any[]; error?: string }>;
+      sessions: {
+        list: () => Promise<{ success: boolean; sessions?: any[]; error?: string }>;
+        setCurrent: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
+        getCurrent: () => Promise<{ success: boolean; session?: any; error?: string }>;
+      };
+      navigate: (url: string, sessionId?: string) => Promise<any>;
+      screenshot: (sessionId?: string) => Promise<any>;
+      snapshot: (sessionId?: string) => Promise<any>;
+      click: (selector: string, sessionId?: string) => Promise<any>;
+      type: (selector: string, text: string, sessionId?: string) => Promise<any>;
+      closeSession: (sessionId: string) => Promise<any>;
+      stats: () => Promise<any>;
+      scroll: (pixels: number, sessionId?: string) => Promise<any>;
+      scrollToEnd: (maxScrolls: number, sessionId?: string) => Promise<any>;
+      evaluate: (expression: string, sessionId?: string) => Promise<any>;
+      waitForSelector: (selector: string, timeoutMs: number, sessionId?: string) => Promise<any>;
+    };
+    // Extension Bridge
+    extensionBridge: {
+      status: () => Promise<any>;
+      start: (port: number) => Promise<any>;
+      stop: () => Promise<any>;
+      navigate: (url: string) => Promise<any>;
+      snapshot: () => Promise<any>;
+      click: (selector: string) => Promise<any>;
+      type: (selector: string, text: string) => Promise<any>;
+      screenshot: () => Promise<any>;
     };
     quickChat: {
       getSettings: () => Promise<any>;

@@ -3,7 +3,6 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -385,15 +384,11 @@ export default function AIBuilderPage() {
                   <CardContent className="p-0">
                     <div className="h-[600px] border">
                       <WorkflowCanvas
-                        nodes={generatedWorkflow.nodes}
-                        edges={generatedWorkflow.edges}
-                        onNodesChange={(nodes) =>
-                          setGeneratedWorkflow({ ...generatedWorkflow, nodes })
+                        initialNodes={generatedWorkflow.nodes}
+                        initialEdges={generatedWorkflow.edges}
+                        onChange={(nodes, edges) =>
+                          setGeneratedWorkflow({ ...generatedWorkflow, nodes, edges })
                         }
-                        onEdgesChange={(edges) =>
-                          setGeneratedWorkflow({ ...generatedWorkflow, edges })
-                        }
-                        readonly={false}
                       />
                     </div>
                   </CardContent>

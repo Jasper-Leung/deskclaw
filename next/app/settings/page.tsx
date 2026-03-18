@@ -6,13 +6,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Loader2, Check, X, Edit, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import type { Provider, Model } from '@shared/types';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('settings-page');
+
+interface ModelWithProvider extends Model {
+  providerName?: string;
+}
 
 export default function SettingsPage() {
-  const [providers, setProviders] = useState<any[]>([]);
-  const [models, setModels] = useState<any[]>([]);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [models, setModels] = useState<ModelWithProvider[]>([]);
   const [showAddProvider, setShowAddProvider] = useState(false);
   const [showAddModel, setShowAddModel] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<any | null>(null);
+  const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [testingModel, setTestingModel] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -37,7 +45,7 @@ export default function SettingsPage() {
         setModels(modelsData);
 
         const savedDefault = localStorage.getItem('deskclaw-default-model');
-        if (savedDefault && modelsData.some((m: any) => m.id === savedDefault)) {
+        if (savedDefault && modelsData.some((m: Model) => m.id === savedDefault)) {
           setDefaultModel(savedDefault);
         } else if (modelsData.length > 0) {
           setDefaultModel(modelsData[0].id);
@@ -49,7 +57,7 @@ export default function SettingsPage() {
         }
       }
     } catch (error) {
-      console.error('Failed to load data:', error);
+      logger.error({ error }, 'Failed to load data');
     }
   };
 
@@ -61,8 +69,9 @@ export default function SettingsPage() {
         const result = await window.electronAPI.providers.test(id);
         setTestResult({ success: true, message: result.message });
       }
-    } catch (error: any) {
-      setTestResult({ success: false, message: error.message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setTestResult({ success: false, message });
     } finally {
       setTestingProvider(null);
     }
@@ -89,7 +98,7 @@ export default function SettingsPage() {
       if (window.electronAPI) {
         await window.electronAPI.providers.testModel({
           protocol: provider.protocol,
-          baseUrl: provider.base_url,
+          baseUrl: provider.baseUrl,
           apiKey: (formData.get('apiKey') as string) || '',
           modelId: modelId,
         });
@@ -99,8 +108,9 @@ export default function SettingsPage() {
           message: 'Connection test passed! Model ID is valid and accessible.',
         });
       }
-    } catch (error: any) {
-      setTestResult({ success: false, message: error.message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setTestResult({ success: false, message });
     } finally {
       setTestingModel(false);
     }
@@ -132,8 +142,9 @@ export default function SettingsPage() {
         setShowAddModel(false);
         setTestResult({ success: true, message: 'Model saved successfully!' });
       }
-    } catch (error: any) {
-      setTestResult({ success: false, message: error.message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setTestResult({ success: false, message });
     }
   };
 
@@ -153,7 +164,7 @@ export default function SettingsPage() {
         setShowAddProvider(false);
       }
     } catch (error) {
-      console.error('Failed to add provider:', error);
+      logger.error({ error }, 'Failed to add provider');
       alert('Failed to add provider. Please try again.');
     }
   };
@@ -172,7 +183,7 @@ export default function SettingsPage() {
         await loadData();
       }
     } catch (error) {
-      console.error('Failed to delete provider:', error);
+      logger.error({ error }, 'Failed to delete provider');
     }
   };
 
@@ -194,7 +205,7 @@ export default function SettingsPage() {
         setTestResult({ success: true, message: 'Provider updated successfully!' });
       }
     } catch (error) {
-      console.error('Failed to update provider:', error);
+      logger.error({ error }, 'Failed to update provider');
       alert('Failed to update provider. Please try again.');
     }
   };
@@ -208,7 +219,7 @@ export default function SettingsPage() {
         await loadData();
       }
     } catch (error) {
-      console.error('Failed to delete model:', error);
+      logger.error({ error }, 'Failed to delete model');
     }
   };
 
@@ -224,7 +235,7 @@ export default function SettingsPage() {
         await window.electronAPI.settings.set('skipSecurityPrompts', value.toString());
       }
     } catch (error) {
-      console.error('Failed to save setting:', error);
+      logger.error({ error }, 'Failed to save setting');
     }
   };
 
@@ -233,12 +244,15 @@ export default function SettingsPage() {
     setTestResult(null);
   };
 
-  const groupedModels = models.reduce((acc: Record<string, any[]>, model: any) => {
-    const key = model.is_custom ? 'Custom Models' : 'Built-in Models';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(model);
-    return acc;
-  }, {});
+  const groupedModels = models.reduce(
+    (acc: Record<string, ModelWithProvider[]>, model: ModelWithProvider) => {
+      const key = model.isCustom ? 'Custom Models' : 'Built-in Models';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(model);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <AppShell>
@@ -287,9 +301,9 @@ export default function SettingsPage() {
               ) : (
                 Object.entries(groupedModels).map(([group, groupModels]) => (
                   <optgroup key={group} label={group}>
-                    {(groupModels as any[]).map((model: any) => (
+                    {groupModels.map((model) => (
                       <option key={model.id} value={model.id}>
-                        {model.display_name} ({model.provider_name})
+                        {model.displayName} {model.providerName ? `(${model.providerName})` : ''}
                       </option>
                     ))}
                   </optgroup>
@@ -298,7 +312,7 @@ export default function SettingsPage() {
             </select>
             {defaultModel && (
               <span className="text-sm text-muted-foreground">
-                Default: {models.find((m) => m.id === defaultModel)?.display_name}
+                Default: {models.find((m) => m.id === defaultModel)?.displayName}
               </span>
             )}
           </div>
@@ -425,7 +439,7 @@ export default function SettingsPage() {
                   <Input
                     id="edit-baseUrl"
                     name="baseUrl"
-                    defaultValue={editingProvider.base_url}
+                    defaultValue={editingProvider.baseUrl}
                     required
                   />
                 </div>
@@ -458,7 +472,7 @@ export default function SettingsPage() {
                 <div>
                   <h3 className="font-semibold">{provider.name}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {provider.protocol} · {provider.base_url}
+                    {provider.protocol} · {provider.baseUrl}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -612,16 +626,16 @@ export default function SettingsPage() {
                 <div key={group}>
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">{group}</h3>
                   <div className="grid gap-4 md:grid-cols-2">
-                    {(groupModels as any[]).map((model: any) => (
+                    {groupModels.map((model) => (
                       <div
                         key={model.id}
                         className={`flex items-center justify-between rounded-lg border p-4 ${defaultModel === model.id ? 'border-primary bg-primary/5' : ''}`}
                       >
                         <div className="flex items-center gap-3">
                           <div>
-                            <h3 className="font-semibold">{model.display_name}</h3>
+                            <h3 className="font-semibold">{model.displayName}</h3>
                             <p className="text-sm text-muted-foreground">
-                              {model.provider_name} · {model.model_id}
+                              {model.providerName} · {model.modelId}
                             </p>
                           </div>
                           {defaultModel === model.id && (
