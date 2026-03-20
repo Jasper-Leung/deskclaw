@@ -316,7 +316,7 @@ describe('Tools System', () => {
       const result = await executeTool('web_search', { query: 'test query' });
       // The result might be successful or failed depending on network
       expect(result).toBeDefined();
-    }, 10000);
+    }, 30000);
   });
 
   describe('http_request tool', () => {
@@ -329,7 +329,7 @@ describe('Tools System', () => {
       });
       expect(result).toBeDefined();
       // The result might be successful or failed depending on network
-    }, 10000);
+    }, 30000);
 
     it('should make HTTP POST request', async () => {
       const { executeTool } = await import('./index.js');
@@ -339,7 +339,7 @@ describe('Tools System', () => {
         body: { test: 'data' },
       });
       expect(result).toBeDefined();
-    }, 10000);
+    }, 30000);
   });
 
   describe('scheduled_* tools', () => {
@@ -418,7 +418,7 @@ describe('Tools System', () => {
       expect(result).toBeDefined();
       // Note: This test makes real network calls to Yahoo Finance
       // In a real test environment, you might want to mock fetch
-    }, 10000);
+    }, 30000);
 
     it('should handle multiple symbols', async () => {
       const { executeTool } = await import('./index.js');
@@ -427,7 +427,7 @@ describe('Tools System', () => {
         fields: 'price',
       });
       expect(result).toBeDefined();
-    }, 10000);
+    }, 30000);
   });
 
   describe('list_skills tool', () => {
