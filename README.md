@@ -293,8 +293,8 @@ google-chrome --remote-debugging-port=9222
 Or use the provided scripts:
 
 ```bash
-npm run chrome:start    # Check Chrome status
-npm run chrome:check    # Start Chrome with debugging
+npm run chrome:check    # Check Chrome status
+npm run chrome:start    # Start Chrome with debugging
 ```
 
 ### Installation

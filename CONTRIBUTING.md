@@ -33,7 +33,7 @@ Thank you for your interest in contributing to DeskClaw! This document provides 
 2. Clone your fork:
 
    ```bash
-   git clone https://github.com/your-username/deskclaw.git
+   git clone https://github.com/Jasper-Leung/deskclaw.git
    cd deskclaw
    ```
 
@@ -241,7 +241,6 @@ Our project uses Husky to enforce commit conventions:
 - Automated checks must pass
 - At least one approval required
 - Address review feedback
-  re the requested changes
 
 ### Merging
 
@@ -251,9 +250,9 @@ Our project uses Husky to enforce commit conventions:
 
 ## Getting Help
 
-- Check existing [issues](https://github.com/your-username/deskclaw/issues)
-- Start a [discussion](https://github.com/your-username/deskclaw/discussions)
-- Read the [documentation](https://github.com/your-username/deskclaw/wiki)
+- Check existing [issues](https://github.com/Jasper-Leung/deskclaw/issues)
+- Start a [discussion](https://github.com/Jasper-Leung/deskclaw/discussions)
+- Read the [documentation](https://github.com/Jasper-Leung/deskclaw/wiki)
 
 ## License
 
