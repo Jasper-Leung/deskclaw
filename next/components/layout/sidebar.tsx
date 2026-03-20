@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import {
@@ -83,8 +84,8 @@ export function Sidebar() {
           {/* Header */}
           <div className="flex h-16 items-center justify-between border-b px-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Bot className="h-5 w-5" />
+              <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-primary">
+                <Image src="/icon.png" alt="DeskClaw" width={32} height={32} className="h-5 w-5" />
               </div>
               {!sidebarCollapsed && <span className="font-semibold">DeskClaw</span>}
             </div>
