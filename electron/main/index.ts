@@ -11,6 +11,13 @@ import { ipcLogger } from './lib/logger.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Disable console.log in production for security and performance
+if (process.env.NODE_ENV === 'production') {
+  console.log = () => {};
+  console.debug = () => {};
+  console.info = () => {};
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 const createWindow = () => {

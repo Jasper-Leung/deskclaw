@@ -146,8 +146,17 @@ async function handleDeskClawMessage(message) {
       break;
 
     case 'evaluate':
-      // Evaluate JavaScript
+      // Evaluate JavaScript (with security validation)
       if (data.script) {
+        // Security check: validate script before execution
+        if (!isScriptSafe(data.script)) {
+          sendToDeskClaw({
+            type: 'error',
+            error: 'Script rejected: contains potentially dangerous operations',
+          });
+          break;
+        }
+
         const tab = await getCurrentTab();
         if (tab) {
           if (!isAccessibleUrl(tab.url)) {
@@ -157,9 +166,11 @@ async function handleDeskClawMessage(message) {
             });
             break;
           }
+
+          // Use safer evaluation method with try-catch
           const result = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: new Function(data.script),
+            func: new Function('try { ' + data.script + ' } catch(e) { return {error: e.message}; }'),
           });
           sendToDeskClaw({
             type: 'success',
@@ -202,6 +213,49 @@ function isAccessibleUrl(url) {
   ) {
     return false;
   }
+  return true;
+}
+
+// Security validation for scripts to prevent code injection
+function isScriptSafe(script) {
+  if (!script || typeof script !== 'string') return false;
+
+  // Block dangerous patterns
+  const dangerousPatterns = [
+    /fetch\s*\(/i,
+    /XMLHttpRequest/i,
+    /\.import\s*\(/i,
+    /eval\s*\(/i,
+    /new\s+Function\s*\(/i,
+    /document\.write/i,
+    /innerHTML\s*=/i,
+    /outerHTML\s*=/i,
+    /localStorage\s*\./i,
+    /sessionStorage\s*\./i,
+    /indexedDB\s*\./i,
+    /\.postMessage\s*\(/i,
+    /\.addEventListener\s*\(/i,
+    /Worker\s*\(/i,
+    /importScripts\s*\(/i,
+    /@sourceURL/i,
+    ///# sourceMappingURL/i,
+    /\/\/@.*?sourceURL/i,
+  ];
+
+  // Check for dangerous patterns
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(script)) {
+      console.warn('Blocked potentially dangerous script pattern:', pattern);
+      return false;
+    }
+  }
+
+  // Limit script length to prevent abuse
+  if (script.length > 10000) {
+    console.warn('Script exceeds maximum allowed length');
+    return false;
+  }
+
   return true;
 }
 

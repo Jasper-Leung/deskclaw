@@ -4,7 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.1.0   | :white_check_mark: |
+| 0.2.0+  | :white_check_mark: |
+| 0.1.x   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -25,11 +26,28 @@ If you discover a security vulnerability in this project, please follow these st
 
 DeskClaw includes several security features by design:
 
+### Core Security
 - **Local-First Architecture**: All data is stored locally on your machine
 - **Encryption**: API keys and sensitive data are encrypted with AES-256-GCM
 - **No Telemetry**: We do not collect any usage data or telemetry
 - **Approval Gates**: Dangerous operations require explicit user approval
 - **Sandboxed Environment**: Electron security policies are enforced
+
+### Browser Security (v0.2.0+)
+- **Script Validation**: Browser extension validates all JavaScript before execution
+- **Pattern Blocking**: Dangerous patterns (fetch, eval, innerHTML, etc.) are blocked
+- **Length Limits**: Scripts are limited to 10,000 characters to prevent abuse
+- **URL Restrictions**: Cannot access chrome://, edge://, or other internal URLs
+
+### Logging Security (v0.2.0+)
+- **Production Console Disabled**: console.log/debug/info are disabled in production builds
+- **Structured Logging**: Uses Pino for secure, structured logging with log levels
+- **Log Rotation**: Logs are stored in user data directory with proper management
+
+### Automated Security (v0.2.0+)
+- **CI/CD Security Scanning**: npm audit runs on every pull request
+- **Snyk Integration**: Automated vulnerability scanning (optional, with SNYK_TOKEN)
+- **Dependency Audits**: Regular security audits of npm dependencies
 
 ## Best Practices for Users
 
@@ -38,6 +56,7 @@ DeskClaw includes several security features by design:
 3. **Review permissions** - Only grant necessary permissions to skills and integrations
 4. **Use strong API keys** - When adding AI providers, use strong, unique API keys
 5. **Monitor shell commands** - Review and approve shell commands carefully
+6. **Review browser scripts** - Be cautious when allowing AI to execute JavaScript in browsers
 
 ## Responsible Disclosure
 
@@ -51,6 +70,14 @@ We follow responsible disclosure principles and will:
 ## Security Audits
 
 If you're interested in conducting a security audit of DeskClaw, please open a report through GitHub's Private Vulnerability Reporting.
+
+## Recent Security Improvements
+
+### v0.2.0
+- Added browser script validation and pattern blocking
+- Disabled console output in production builds
+- Added automated security scanning in CI/CD
+- Enhanced input validation for file operations
 
 ## License
 

@@ -1,6 +1,6 @@
-import { readFile, writeFile, access, constants, readdir, mkdir } from 'fs/promises';
-import { join, dirname, isAbsolute } from 'path';
-import { homedir } from 'os';
+import { readFile, writeFile, access, constants, readdir, mkdir, statSync } from 'fs/promises';
+import { join, dirname, isAbsolute, normalize, resolve } from 'path';
+import { homedir, tmpdir } from 'os';
 import process from 'process';
 import type Database from 'better-sqlite3';
 import { getDatabase } from '../db/index.js';
@@ -14,6 +14,141 @@ import type { TaskType } from '../ipc/scheduled.js';
 // Import skills system for skill execution tool
 import { getSkillExecutor } from '../skills/skill-executor.js';
 import { executeSkill as executeSkillDB, getEnabledSkills } from '../ipc/skills.js';
+
+/**
+ * Security: Path validation utilities
+ * Prevents path traversal attacks and restricts file access
+ */
+
+// Get temp directory for allowed paths
+const TEMP_DIR = tmpdir();
+
+// Blocked paths that should never be accessed (only exact matches, not subdirectories)
+const BLOCKED_PATHS = [
+  '/etc/passwd',
+  '/etc/shadow',
+  '/root/.ssh',
+  '/root/.gnupg',
+  'C:\\Windows\\System32\\config',
+];
+
+// Blocked file patterns
+const BLOCKED_PATTERNS = [
+  /\.env$/i,
+  /\.env\.local$/i,
+  /\.env\.production$/i,
+  /\.key$/i,
+  /\.pem$/i,
+  /\.p12$/i,
+  /\.pfx$/i,
+  /\/\.ssh\//i,
+  /\/\.gnupg\//i,
+  /\/\.config\/[^\/]*\/[^\/]*\.key/i,
+];
+
+/**
+ * Check if a path contains path traversal attempts
+ */
+function hasPathTraversal(filepath: string): boolean {
+  const normalized = normalize(filepath);
+  // Only block if .. is at the start or middle, not at end
+  const parts = normalized.split(/[/\\]/);
+  for (let i = 0; i < parts.length - 1; i++) {
+    if (parts[i] === '..') {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if a path matches blocked patterns
+ */
+function isBlockedPath(filepath: string): boolean {
+  const normalized = normalize(filepath).toLowerCase();
+
+  // Check blocked patterns
+  for (const pattern of BLOCKED_PATTERNS) {
+    if (pattern.test(normalized)) {
+      return true;
+    }
+  }
+
+  // Check blocked exact paths
+  for (const blocked of BLOCKED_PATHS) {
+    if (blocked && normalized === normalize(blocked).toLowerCase()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if path is in an allowed directory (temp or work directory)
+ */
+function isAllowedDirectory(filepath: string): boolean {
+  const normalized = normalize(filepath).toLowerCase();
+
+  // Always allow temp directory
+  if (normalized.startsWith(normalize(TEMP_DIR).toLowerCase())) {
+    return true;
+  }
+
+  // Allow DeskClaw projects directory
+  if (normalized.includes('deskclawprojects')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Validate and sanitize a file path
+ * Returns null if path is invalid, otherwise returns the validated path
+ */
+function validatePath(filepath: string, allowAbsolute: boolean = true): string | null {
+  if (!filepath || typeof filepath !== 'string') {
+    toolLogger.warn('[Path Validation] Empty or invalid path');
+    return null;
+  }
+
+  // Check for path traversal
+  if (hasPathTraversal(filepath)) {
+    toolLogger.warn(`[Path Validation] Path traversal detected: ${filepath}`);
+    return null;
+  }
+
+  // Check for blocked paths (but allow temp directory)
+  if (!isAllowedDirectory(filepath) && isBlockedPath(filepath)) {
+    toolLogger.warn(`[Path Validation] Blocked path access: ${filepath}`);
+    return null;
+  }
+
+  // For absolute paths, additional checks
+  if (isAbsolute(filepath)) {
+    if (!allowAbsolute) {
+      toolLogger.warn(`[Path Validation] Absolute path not allowed: ${filepath}`);
+      return null;
+    }
+
+    // Normalize the path
+    const normalized = normalize(filepath);
+
+    // Additional check: ensure path doesn't escape to sensitive directories
+    for (const blocked of BLOCKED_PATHS) {
+      if (blocked && normalized.startsWith(normalize(blocked))) {
+        toolLogger.warn(`[Path Validation] Path in blocked directory: ${filepath}`);
+        return null;
+      }
+    }
+
+    return normalized;
+  }
+
+  // Relative paths are allowed (will be resolved against work directory)
+  return normalize(filepath);
+}
 
 // Type definitions for database query results
 interface SettingsRow {
@@ -174,20 +309,31 @@ tools.file_read = {
   handler: async (params) => {
     // Support both 'filepath' and 'path' parameters
     const filepath = (params.filepath || params.path) as string;
+
+    // Security: Validate path before accessing
+    const validatedPath = validatePath(filepath, true);
+    if (!validatedPath) {
+      toolLogger.error(`[file_read] Path validation failed: ${filepath}`);
+      return {
+        result: null,
+        error: `Access denied: Invalid or blocked path "${filepath}"`,
+      };
+    }
+
     try {
-      let fullPath = filepath;
-      let displayPath = filepath;
+      let fullPath = validatedPath;
+      let displayPath = validatedPath;
       const workDir = getWorkDirectory();
 
       // Handle relative paths using path.isAbsolute()
-      if (!isAbsolute(filepath)) {
+      if (!isAbsolute(validatedPath)) {
         // Try work directory first
-        fullPath = join(workDir, filepath);
+        fullPath = join(workDir, validatedPath);
         displayPath = fullPath;
       }
 
       toolLogger.info(
-        `[file_read] filepath="${filepath}", isAbsolute=${isAbsolute(filepath)}, fullPath="${fullPath}"`
+        `[file_read] filepath="${filepath}", isAbsolute=${isAbsolute(validatedPath)}, fullPath="${fullPath}"`
       );
 
       // Check if file exists
@@ -261,20 +407,30 @@ tools.file_write = {
     const filepath = (params.filepath || params.path || params.filePath) as string;
     const content = params.content as string;
 
+    // Security: Validate path before accessing
+    const validatedPath = validatePath(filepath, true);
+    if (!validatedPath) {
+      toolLogger.error(`[file_write] Path validation failed: ${filepath}`);
+      return {
+        result: null,
+        error: `Access denied: Invalid or blocked path "${filepath}"`,
+      };
+    }
+
     try {
-      let fullPath = filepath;
-      let displayPath = filepath;
+      let fullPath = validatedPath;
+      let displayPath = validatedPath;
       const workDir = getWorkDirectory();
 
       // Handle relative paths using path.isAbsolute()
-      if (!isAbsolute(filepath)) {
+      if (!isAbsolute(validatedPath)) {
         // Use work directory for relative paths
-        fullPath = join(workDir, filepath);
+        fullPath = join(workDir, validatedPath);
         displayPath = fullPath; // Show full path to user
       }
 
       toolLogger.info(
-        `[file_write] filepath="${filepath}", isAbsolute=${isAbsolute(filepath)}, fullPath="${fullPath}"`
+        `[file_write] filepath="${filepath}", isAbsolute=${isAbsolute(validatedPath)}, fullPath="${fullPath}"`
       );
 
       // Create directory if it doesn't exist
@@ -331,19 +487,36 @@ tools.file_list = {
     const pattern = (params.pattern as string) || '*';
     const workDir = getWorkDirectory();
 
+    // Security: Validate path before accessing
+    const validatedPath = validatePath(dirpath, true);
+    if (!validatedPath) {
+      toolLogger.error(`[file_list] Path validation failed: ${dirpath}`);
+      return {
+        result: {
+          path: dirpath,
+          fullPath: dirpath,
+          workDir,
+          entries: [],
+          total: 0,
+          exists: false,
+          message: `Access denied: Invalid or blocked path "${dirpath}"`,
+        },
+      };
+    }
+
     try {
-      let fullPath = dirpath;
-      let displayPath = dirpath;
+      let fullPath = validatedPath;
+      let displayPath = validatedPath;
 
       // Handle relative paths using path.isAbsolute()
-      if (!isAbsolute(dirpath)) {
+      if (!isAbsolute(validatedPath)) {
         // Use work directory for relative paths
-        fullPath = join(workDir, dirpath);
+        fullPath = join(workDir, validatedPath);
         displayPath = fullPath;
       }
 
       toolLogger.info(
-        `[file_list] dirpath="${dirpath}", isAbsolute=${isAbsolute(dirpath)}, fullPath="${fullPath}"`
+        `[file_list] dirpath="${dirpath}", isAbsolute=${isAbsolute(validatedPath)}, fullPath="${fullPath}"`
       );
 
       // Check if directory exists
