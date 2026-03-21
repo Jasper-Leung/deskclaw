@@ -440,10 +440,60 @@ const { currentModel, setCurrentModel, theme, setTheme } = useAppStore();
 
 ## 🙏 致谢
 
-- 使用 [Electron](https://www.electronjs.org/) 构建
-- [shadcn/ui](https://ui.shadcn.com/) 的 UI 组件
-- 使用 [Tailwind CSS](https://tailwindcss.com/) 设置样式
-- 通过 [Vercel AI SDK](https://sdk.vercel.ai/) 进行 LLM 集成
-- 使用 [React Flow](https://reactflow.dev/) 制作工作流编辑器
-- 通过 [Anthropic](https://www.anthropic.com/) 的 [Model Context Protocol](https://modelcontextprotocol.io/) 实现浏览器自动化
-- 使用 [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp) 进行 Chrome DevTools 集成
+本项目基于优秀的开源软件构建：
+
+### 核心框架
+- [Electron](https://www.electronjs.org/) - 跨平台桌面应用框架
+- [Next.js](https://nextjs.org/) - React 框架（App Router）
+- [React](https://react.dev/) - UI 库
+- [TypeScript](https://www.typescriptlang.org/) - 类型安全的 JavaScript
+
+### UI 组件与样式
+- [shadcn/ui](https://ui.shadcn.com/) - 基于 Radix UI 构建的精美 UI 组件
+- [Radix UI](https://www.radix-ui.com/) - 无样式、可访问的 UI 组件
+- [Tailwind CSS](https://tailwindcss.com/) - 实用优先的 CSS 框架
+- [Lucide](https://lucide.dev/) - 精美的图标库
+- [Sonner](https://sonner.emilkowal.ski/) - Toast 通知组件
+
+### 数据与状态管理
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - Node.js 最快的 SQLite 库
+- [Zustand](https://zustand-demo.pmnd.rs/) - 小巧快速的状态管理库
+- [Pino](https://getpino.io/) - 快速的 JSON 日志记录器
+
+### AI 与 LLM 集成
+- [Vercel AI SDK](https://sdk.vercel.ai/) - 构建 AI 驱动的应用程序
+- [Model Context Protocol](https://modelcontextprotocol.io/) - AI 模型上下文标准
+- [Anthropic](https://www.anthropic.com/) - AI 服务提供商
+- [OpenAI](https://openai.com/) - AI 服务提供商
+- [js-tiktoken](https://github.com/dqbd/tiktoken) - GPT 模型的 token 计数工具
+
+### 自动化与浏览器控制
+- [Playwright](https://playwright.dev/) - 浏览器自动化
+- [@nut-tree/nut-js](https://nutjs.dev/) - 跨平台桌面自动化（Windows、macOS、Linux）
+- [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp) - Chrome DevTools 集成
+
+### 工作流与可视化
+- [React Flow](https://reactflow.dev/) - 工作流编辑器和可视化
+
+### 消息平台
+- [@slack/bolt](https://slack.dev/bolt-js/) - Slack 应用框架
+- [discord.js](https://discord.js.org/) - Discord API for Node.js
+- [grammy](https://grammy.dev/) - Telegram Bot API 框架
+- [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) - WhatsApp Web API
+- [Bot Builder](https://github.com/microsoft/botbuilder) - Microsoft Bot Framework
+
+### 工具库
+- [date-fns](https://date-fns.org/) - 日期操作库
+- [clsx](https://github.com/lukeed/clsx) - 条件 className 工具
+- [class-variance-authority](https://cva.style/) - 组件变体工具
+- [keytar](https://github.com/atom/node-keytar) - 原生凭据存储
+- [node-cron](https://www.npmjs.com/package/node-cron) - 任务调度器
+
+### 开发工具
+- [Vitest](https://vitest.dev/) - 快速的单元测试框架
+- [ESLint](https://eslint.org/) - JavaScript 代码检查工具
+- [Prettier](https://prettier.io/) - 代码格式化工具
+- [Husky](https://typicode.github.io/husky/) - Git hooks 工具
+
+### 灵感来源
+本项目受到本地优先、隐私优先计算运动的启发，旨在将 AI Agent 能力带到桌面环境，同时保持用户对数据的控制权。

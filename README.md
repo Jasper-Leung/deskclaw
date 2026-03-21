@@ -440,10 +440,60 @@ See [CHANGELOG.md](CHANGELOG.md) for a list of changes in each version.
 
 ## 🙏 Acknowledgments
 
-- Built with [Electron](https://www.electronjs.org/)
-- UI components from [shadcn/ui](https://ui.shadcn.com/)
-- Styling with [Tailwind CSS](https://tailwindcss.com/)
-- LLM integration via [Vercel AI SDK](https://sdk.vercel.ai/)
-- Workflow editor with [React Flow](https://reactflow.dev/)
-- Browser automation via [Model Context Protocol](https://modelcontextprotocol.io/) by [Anthropic](https://www.anthropic.com/)
-- Chrome DevTools integration with [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp)
+This project is built upon amazing open-source software:
+
+### Core Framework
+- [Electron](https://www.electronjs.org/) - Cross-platform desktop application framework
+- [Next.js](https://nextjs.org/) - React framework with App Router
+- [React](https://react.dev/) - UI library
+- [TypeScript](https://www.typescriptlang.org/) - Type-safe JavaScript
+
+### UI Components & Styling
+- [shadcn/ui](https://ui.shadcn.com/) - Beautiful UI components built with Radix UI
+- [Radix UI](https://www.radix-ui.com/) - Unstyled, accessible UI components
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Lucide](https://lucide.dev/) - Beautiful icon library
+- [Sonner](https://sonner.emilkowal.ski/) - Toast notifications
+
+### Data & State Management
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - Fastest SQLite library for Node.js
+- [Zustand](https://zustand-demo.pmnd.rs/) - Small, fast state management
+- [Pino](https://getpino.io/) - Fast JSON logger
+
+### AI & LLM Integration
+- [Vercel AI SDK](https://sdk.vercel.ai/) - Build AI-powered applications
+- [Model Context Protocol](https://modelcontextprotocol.io/) - Standard for AI model context
+- [Anthropic](https://www.anthropic.com/) - AI provider
+- [OpenAI](https://openai.com/) - AI provider
+- [js-tiktoken](https://github.com/dqbd/tiktoken) - Token counting for GPT models
+
+### Automation & Browser Control
+- [Playwright](https://playwright.dev/) - Browser automation
+- [@nut-tree/nut-js](https://nutjs.dev/) - Desktop automation for Windows, macOS, and Linux
+- [chrome-devtools-mcp](https://github.com/modelcontextprotocol/inspect-aurora/tree/main/chrome-devtools-mcp) - Chrome DevTools integration
+
+### Workflow & Visualization
+- [React Flow](https://reactflow.dev/) - Workflow editor and visualization
+
+### Messaging Platforms
+- [@slack/bolt](https://slack.dev/bolt-js/) - Slack app framework
+- [discord.js](https://discord.js.org/) - Discord API for Node.js
+- [grammy](https://grammy.dev/) - Telegram Bot API framework
+- [@whiskeysockets/baileys](https://github.com/WhiskeySockets/Baileys) - WhatsApp Web API
+- [Bot Builder](https://github.com/microsoft/botbuilder) - Microsoft Bot Framework
+
+### Utilities
+- [date-fns](https://date-fns.org/) - Date manipulation library
+- [clsx](https://github.com/lukeed/clsx) - Conditional className utility
+- [class-variance-authority](https://cva.style/) - Component variant utility
+- [keytar](https://github.com/atom/node-keytar) - Native credential storage
+- [node-cron](https://www.npmjs.com/package/node-cron) - Task scheduler
+
+### Development Tools
+- [Vitest](https://vitest.dev/) - Fast unit testing framework
+- [ESLint](https://eslint.org/) - JavaScript linter
+- [Prettier](https://prettier.io/) - Code formatter
+- [Husky](https://typicode.github.io/husky/) - Git hooks
+
+### Inspiration
+This project is inspired by the local-first, privacy-focused computing movement and the goal of bringing AI agent capabilities to desktop environments while maintaining user control over data.
