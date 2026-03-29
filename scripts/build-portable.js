@@ -37,23 +37,41 @@ try {
     // Ignore errors if directories don't exist
   }
 
-  // Step 2: Build electron
+  // Step 2: Rebuild native modules for Electron
+  console.log('\n🔧 Rebuilding native modules for Electron...');
+  try {
+    execSync('npx electron-rebuild', {
+      cwd: join(__dirname, '..'),
+      stdio: 'inherit',
+    });
+  } catch (e) {
+    console.warn('⚠️ electron-rebuild failed, continuing anyway:', e.message);
+  }
+
+  // Step 3: Build electron
   console.log('\n📦 Building Electron main process...');
   execSync('node build-electron.js', {
     cwd: join(__dirname, '..'),
     stdio: 'inherit',
   });
 
-  // Step 3: Build Next.js
+  // Step 4: Build Next.js
   console.log('\n🔨 Building Next.js frontend...');
   execSync('npx rimraf next/.next && cd next && npx next build', {
     cwd: join(__dirname, '..'),
     stdio: 'inherit',
   });
 
-  // Step 4: Build portable executable
+  // Step 5: Build portable executable
   console.log('\n💿 Building portable executable...');
   execSync('npx electron-builder --win --x64 --publish never', {
+    cwd: join(__dirname, '..'),
+    stdio: 'inherit',
+  });
+
+  // Step 6: Fix packaged modules (copy botbuilder-std lib to top level)
+  console.log('\n🔧 Fixing packaged modules...');
+  execSync('node scripts/fix-packaged-modules.js', {
     cwd: join(__dirname, '..'),
     stdio: 'inherit',
   });

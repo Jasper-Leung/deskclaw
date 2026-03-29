@@ -20,9 +20,9 @@ interface Agent {
 
 interface Model {
   id: string;
-  model_id: string;
-  display_name: string;
-  provider_name: string;
+  modelId: string;
+  displayName: string;
+  providerName: string;
 }
 
 export default function AgentsPage() {
@@ -142,7 +142,7 @@ export default function AgentsPage() {
                   <option value="">Select a model</option>
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.display_name} ({model.provider_name})
+                      {model.displayName} ({model.providerName})
                     </option>
                   ))}
                 </select>
@@ -208,7 +208,7 @@ export default function AgentsPage() {
                   <option value="">Select a model</option>
                   {models.map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.display_name} ({model.provider_name})
+                      {model.displayName} ({model.providerName})
                     </option>
                   ))}
                 </select>
@@ -269,7 +269,7 @@ export default function AgentsPage() {
                     {agent.model_id && (
                       <p className="text-xs text-muted-foreground mt-2">
                         Model:{' '}
-                        {models.find((m) => m.id === agent.model_id)?.display_name || 'Unknown'}
+                        {models.find((m) => m.id === agent.model_id)?.displayName || 'Unknown'}
                       </p>
                     )}
                   </div>

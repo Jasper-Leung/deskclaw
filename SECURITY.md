@@ -4,7 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.2.0+  | :white_check_mark: |
+| 0.3.0+  | :white_check_mark: |
+| 0.2.x   | :x:                |
 | 0.1.x   | :x:                |
 
 ## Reporting a Vulnerability
@@ -49,6 +50,10 @@ DeskClaw includes several security features by design:
 - **Snyk Integration**: Automated vulnerability scanning (optional, with SNYK_TOKEN)
 - **Dependency Audits**: Regular security audits of npm dependencies
 
+### Data Mapping Security (v0.3.0+)
+- **Field Mapping**: Database fields are properly mapped between snake_case and camelCase to prevent data leakage through undefined properties
+- **Input Validation**: Provider and model data validated on both frontend and backend boundaries
+
 ## Best Practices for Users
 
 1. **Keep your encryption key safe** - If you lose it, your encrypted API keys will be inaccessible
@@ -72,6 +77,12 @@ We follow responsible disclosure principles and will:
 If you're interested in conducting a security audit of DeskClaw, please open a report through GitHub's Private Vulnerability Reporting.
 
 ## Recent Security Improvements
+
+### v0.3.0
+- Fixed database field mapping to prevent data exposure through undefined properties
+- Added input validation for provider and model data
+- Fixed protocol handler to properly serve public assets
+- Improved dark theme handling to prevent UI information leakage
 
 ### v0.2.0
 - Added browser script validation and pattern blocking

@@ -49,10 +49,10 @@ interface Message {
 
 interface Model {
   id: string;
-  model_id: string;
-  display_name: string;
-  provider_name: string;
-  is_custom: number;
+  modelId: string;
+  displayName: string;
+  providerName: string;
+  isCustom: boolean;
 }
 
 interface Session {
@@ -2529,7 +2529,7 @@ export default function ChatPage() {
   };
 
   const groupedModels = models.reduce((acc: Record<string, Model[]>, model: Model) => {
-    const key = model.is_custom ? 'Custom Models' : 'Built-in Models';
+    const key = model.isCustom ? 'Custom Models' : 'Built-in Models';
     if (!acc[key]) acc[key] = [];
     acc[key].push(model);
     return acc;
@@ -2657,7 +2657,7 @@ export default function ChatPage() {
                             <SelectLabel>{group}</SelectLabel>
                             {(groupModels as Model[]).map((model) => (
                               <SelectItem key={model.id} value={model.id}>
-                                {model.display_name} ({model.provider_name})
+                                {model.displayName} ({model.providerName})
                               </SelectItem>
                             ))}
                           </SelectGroup>
@@ -3361,7 +3361,7 @@ export default function ChatPage() {
                           <SelectLabel>{group}</SelectLabel>
                           {(groupModels as Model[]).map((model) => (
                             <SelectItem key={model.id} value={model.id}>
-                              {model.display_name}
+                              {model.displayName}
                             </SelectItem>
                           ))}
                         </SelectGroup>

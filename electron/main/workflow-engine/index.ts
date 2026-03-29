@@ -1,6 +1,8 @@
 import type { Database } from 'better-sqlite3';
 import type { Node, Edge } from '@xyflow/react';
 import { randomUUID } from 'crypto';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import { chat as llmChat } from '../ipc/llm.js';
 import { executeShell } from '../ipc/shell.js';
 import { executeTool } from '../tools/index.js';
@@ -12,6 +14,9 @@ import {
   updateWorkflowExecution,
   getWorkflowExecutionStats,
 } from '../db/workflow-versions.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 interface WorkflowNode extends Node {
   data: Record<string, unknown>;
@@ -608,8 +613,10 @@ async function executeNode(
         }
 
         // Execute the sub-workflow
-        const { executeWorkflow } = await import('./index.js');
-        const subResult = await executeWorkflow(
+        // Use absolute path to avoid module resolution issues in packaged app
+        const modulePath = `${__dirname}/index.js`;
+        const { executeWorkflow: executeWorkflowFn } = await import(modulePath);
+        const subResult = await executeWorkflowFn(
           context.db,
           targetWorkflowId,
           workflowDefinition.nodes,

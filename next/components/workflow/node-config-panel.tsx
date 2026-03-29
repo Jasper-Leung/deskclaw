@@ -36,7 +36,7 @@ export function NodeConfigPanel({ node, models, onSave, onClose }: NodeConfigPan
   };
 
   const groupedModels = models.reduce((acc: Record<string, any[]>, model: any) => {
-    const key = model.is_custom ? 'Custom Models' : 'Built-in Models';
+    const key = model.isCustom ? 'Custom Models' : 'Built-in Models';
     if (!acc[key]) acc[key] = [];
     acc[key].push(model);
     return acc;
@@ -82,7 +82,7 @@ export function NodeConfigPanel({ node, models, onSave, onClose }: NodeConfigPan
                       </div>
                       {groupModels.map((model) => (
                         <SelectItem key={model.id} value={model.id}>
-                          {model.display_name}
+                          {model.displayName}
                         </SelectItem>
                       ))}
                     </div>

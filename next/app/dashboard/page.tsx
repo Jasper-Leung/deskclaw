@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/app-shell';
 import { ProactiveContentPanel } from '@/components/evolution/proactive-content';
 import { SmartSuggestions } from '@/components/evolution/smart-suggestions';
@@ -35,6 +36,7 @@ interface LearningData {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<QuickStats>({
     totalMessages: 0,
     workflowsCreated: 0,
@@ -119,7 +121,7 @@ export default function DashboardPage() {
               Welcome to DeskClaw - Your AI-powered assistant
             </p>
           </div>
-          <Button variant="outline" onClick={() => (window.location.href = '/settings')}>
+          <Button variant="outline" onClick={() => router.push('/settings')}>
             <Settings className="h-4 w-4 mr-2" />
             Settings
           </Button>
@@ -222,7 +224,7 @@ export default function DashboardPage() {
                 className="h-20 flex flex-col items-center justify-center gap-2"
                 onClick={() => {
                   window.electronAPI?.evolution?.trackEvent?.('click', { elementId: 'quick-chat' });
-                  window.location.href = '/chat';
+                  router.push('/chat');
                 }}
               >
                 <MessageSquare className="h-5 w-5" />
@@ -234,7 +236,7 @@ export default function DashboardPage() {
                 className="h-20 flex flex-col items-center justify-center gap-2"
                 onClick={() => {
                   window.electronAPI?.evolution?.trackEvent?.('click', { elementId: 'workflows' });
-                  window.location.href = '/workflows';
+                  router.push('/workflows');
                 }}
               >
                 <Workflow className="h-5 w-5" />
@@ -246,7 +248,7 @@ export default function DashboardPage() {
                 className="h-20 flex flex-col items-center justify-center gap-2"
                 onClick={() => {
                   window.electronAPI?.evolution?.trackEvent?.('click', { elementId: 'memory' });
-                  window.location.href = '/memory';
+                  router.push('/memory');
                 }}
               >
                 <Zap className="h-5 w-5" />
@@ -258,7 +260,7 @@ export default function DashboardPage() {
                 className="h-20 flex flex-col items-center justify-center gap-2"
                 onClick={() => {
                   window.electronAPI?.evolution?.trackEvent?.('click', { elementId: 'scheduled' });
-                  window.location.href = '/scheduled';
+                  router.push('/scheduled');
                 }}
               >
                 <Activity className="h-5 w-5" />

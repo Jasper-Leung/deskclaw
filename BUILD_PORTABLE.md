@@ -44,7 +44,7 @@ After successful build, you'll find:
 
 ```
 release/
-└── DeskClaw-0.1.0-portable.exe
+└── DeskClaw-0.3.0-portable.exe
 ```
 
 ## System Requirements

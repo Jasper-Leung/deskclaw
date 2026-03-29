@@ -549,7 +549,7 @@ async function getPredictedTasks() {
     .prepare(
       `
       SELECT pt.*, ui.topic, ui.preferred_hour, ui.preferred_minute,
-             st.next_run, st.last_run
+             st.last_run
       FROM predicted_tasks pt
       LEFT JOIN user_intents ui ON pt.intent_id = ui.id
       LEFT JOIN scheduled_tasks st ON st.name = pt.name
@@ -570,7 +570,6 @@ async function getPredictedTasks() {
       task.preferred_hour !== null
         ? { hour: task.preferred_hour, minute: task.preferred_minute || 0 }
         : undefined,
-    nextRun: task.next_run ? new Date(task.next_run).toLocaleString() : undefined,
     lastRun: task.last_run ? new Date(task.last_run).toLocaleString() : undefined,
   }));
 }

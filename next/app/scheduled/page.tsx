@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 type TaskType = 'workflow' | 'tool' | 'command' | 'prompt' | 'reminder' | 'skill';
 
@@ -58,6 +59,7 @@ const AVAILABLE_TOOLS = [
 ];
 
 export default function ScheduledPage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<ScheduledTask[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [showAddTask, setShowAddTask] = useState(false);
@@ -393,7 +395,7 @@ export default function ScheduledPage() {
                           // Store the session ID to navigate to chat page
                           sessionStorage.setItem('scheduledSessionId', task.sessionId || '');
                           // Navigate to chat page
-                          window.location.href = '/chat';
+                          router.push('/chat');
                         }}
                       >
                         <MessageSquare className="h-4 w-4 mr-1" />

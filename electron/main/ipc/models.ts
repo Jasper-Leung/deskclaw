@@ -17,7 +17,16 @@ export const listModels = (db: Database.Database) => {
     ORDER BY m.created_at DESC
   `);
 
-  return stmt.all();
+  return stmt.all().map((row: any) => ({
+    id: row.id,
+    providerId: row.provider_id,
+    modelId: row.model_id,
+    displayName: row.display_name,
+    isCustom: !!row.is_custom,
+    createdAt: row.created_at,
+    providerName: row.provider_name,
+    providerProtocol: row.provider_protocol,
+  }));
 };
 
 export const createModel = (db: Database.Database, data: CreateModelData) => {

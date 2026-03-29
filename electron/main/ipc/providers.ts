@@ -18,12 +18,20 @@ export interface UpdateProviderData {
 
 export const listProviders = (db: Database.Database) => {
   const stmt = db.prepare(`
-    SELECT id, name, protocol, base_url, created_at, updated_at
+    SELECT id, name, protocol, base_url, api_key_encrypted, created_at, updated_at
     FROM providers
     ORDER BY created_at DESC
   `);
 
-  return stmt.all();
+  return stmt.all().map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    protocol: row.protocol,
+    baseUrl: row.base_url,
+    apiKeyEncrypted: row.api_key_encrypted,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 };
 
 export const createProvider = (db: Database.Database, data: CreateProviderData) => {

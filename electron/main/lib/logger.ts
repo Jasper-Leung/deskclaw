@@ -10,6 +10,21 @@ import path from 'path';
 import { existsSync, mkdirSync } from 'fs';
 import { app } from 'electron';
 
+// Simple error serializer to avoid pino-std-serializers dependency
+const errSerializer = (err: Error): Record<string, unknown> => {
+  if (!err) return {};
+  const obj: Record<string, unknown> = {
+    message: err.message,
+    name: err.name,
+    stack: err.stack,
+  };
+  if ((err as any).code) obj.code = (err as any).code;
+  if ((err as any).errno) obj.errno = (err as any).errno;
+  if ((err as any).syscall) obj.syscall = (err as any).syscall;
+  if ((err as any).path) obj.path = (err as any).path;
+  return obj;
+};
+
 // Log levels
 export enum LogLevel {
   TRACE = 'trace',
@@ -54,7 +69,7 @@ const pinoConfig: pino.LoggerOptions = {
   },
   timestamp: pino.stdTimeFunctions.isoTime,
   serializers: {
-    error: pino.stdSerializers.err,
+    error: errSerializer,
   },
   // In development, use pretty print (optional, requires pino-pretty)
   ...(process.env.NODE_ENV === 'development' && {

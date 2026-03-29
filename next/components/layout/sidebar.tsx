@@ -151,7 +151,7 @@ export function Sidebar() {
           <div className="border-t p-4">
             {!sidebarCollapsed ? (
               <div className="text-xs text-muted-foreground">
-                <p>DeskClaw v0.1.0</p>
+                <p>DeskClaw v0.3.0</p>
                 <p className="mt-1">Local-first AI Agent</p>
               </div>
             ) : (

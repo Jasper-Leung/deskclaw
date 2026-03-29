@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-29
+
+### Added
+
+#### Production Build Improvements
+
+- **Custom Protocol Handler for Public Assets**: Added support for serving static files from `next/public/` directory in the `app://` protocol handler, enabling logo and favicon to load correctly in production builds
+- **Dark Theme Background Color**: Set BrowserWindow `backgroundColor` to `#0a0a0a` to prevent white flash on startup
+- **SSR Dark Theme by Default**: Added `className="dark"` and `bg-background` directly to `<html>` and `<body>` in root layout to ensure first paint uses dark theme
+- **Portable Build Target**: Switched Windows build target from NSIS installer to portable executable, avoiding NSIS memory-mapped file issues on CI/CD
+
+### Fixed
+
+#### UI & Navigation
+
+- **Page Transition White Flash**: Replaced all `window.location.href` navigation with Next.js `router.push()` for client-side routing, eliminating full-page reload white flash on page transitions across Dashboard, Scheduled, and AppShell components
+- **Logo Not Displaying**: Fixed `app://` protocol handler to correctly serve `next/public/` assets (e.g. `/icon.png`), resolving broken logo in production builds
+
+#### Data & Display
+
+- **Providers/Models Blank in Settings**: Fixed `listProviders()` and `listModels()` to map SQLite `snake_case` column names (`base_url`, `provider_id`, `model_id`, `display_name`, `is_custom`, `provider_name`) to `camelCase` JavaScript properties (`baseUrl`, `providerId`, `modelId`, `displayName`, `isCustom`, `providerName`) — resolving blank provider cards, empty model names, and blank edit dialogs in Settings page
+- **Model Dropdown Blank in Quick Chat**: Updated Model interface in Chat, Agents, and Workflow pages to use camelCase fields (`displayName`, `providerName`, `isCustom`, `modelId`), fixing model selection dropdowns showing `()` with blank names
+- **Sidebar Version Number**: Updated footer version from `v0.1.0` to `v0.3.0`
+
+#### Build & CI/CD
+
+- **Release Workflow**: Updated `release.yml` to use `portable` target instead of `nsis` for Windows builds, fixing NSIS `error creating mmap` build failure in GitHub Actions
+- **NSIS Removed from Build Config**: Removed `nsis` target from `package.json` electron-builder config, keeping only `portable` and `zip` targets
+
+### Changed
+
+- Navigation in AppShell now uses Next.js `router.push()` instead of `window.location.href`
+- Database query results for providers and models are now properly mapped to camelCase
+- `is_custom` field is now converted to boolean (`!!row.is_custom`) in model listing
+
 ## [0.2.0] - 2026-03-20
 
 ### Added

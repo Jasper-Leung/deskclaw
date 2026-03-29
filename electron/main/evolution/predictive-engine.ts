@@ -838,29 +838,43 @@ Provide a concise summary that I can quickly review.`;
   }
 
   private savePredictedTask(task: PredictedTask): void {
-    this.db
-      .prepare(
+    try {
+      // Verify intent exists before inserting
+      const intentExists = this.db
+        .prepare('SELECT id FROM user_intents WHERE id = ?')
+        .get(task.intentId);
+
+      if (!intentExists) {
+        dbLogger.warn(`Intent ${task.intentId} not found, skipping predicted task save`);
+        return;
+      }
+
+      this.db
+        .prepare(
+          `
+          INSERT INTO predicted_tasks (
+            id, intent_id, name, description, cron_expression,
+            task_type, task_config, estimated_value, enabled,
+            created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
-        INSERT INTO predicted_tasks (
-          id, intent_id, name, description, cron_expression,
-          task_type, task_config, estimated_value, enabled,
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `
-      )
-      .run(
-        task.id,
-        task.intentId,
-        task.name,
-        task.description,
-        task.cronExpression,
-        task.taskType,
-        JSON.stringify(task.taskConfig),
-        task.estimatedValue,
-        task.enabled ? 1 : 0,
-        Date.now(),
-        Date.now()
-      );
+        )
+        .run(
+          task.id,
+          task.intentId,
+          task.name,
+          task.description,
+          task.cronExpression,
+          task.taskType,
+          JSON.stringify(task.taskConfig),
+          task.estimatedValue,
+          task.enabled ? 1 : 0,
+          Date.now(),
+          Date.now()
+        );
+    } catch (error) {
+      dbLogger.error(error as Error, 'Failed to save predicted task');
+    }
   }
 
   private updatePredictedTask(task: PredictedTask): void {

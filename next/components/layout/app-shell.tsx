@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from './sidebar';
 import { TopBar } from './topbar';
 import { useAppStore } from '@/lib/store';
@@ -12,6 +13,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { theme } = useAppStore();
+  const router = useRouter();
 
   useEffect(() => {
     // Apply theme to document
@@ -25,14 +27,14 @@ export function AppShell({ children }: AppShellProps) {
   // Listen for navigation events from main process
   useEffect(() => {
     const handleNavigate = (route: string) => {
-      window.location.href = route;
+      router.push(route);
     };
 
     // electronAPI is injected by preload script
     if (window.electronAPI) {
       window.electronAPI.onNavigate?.(handleNavigate);
     }
-  }, []);
+  }, [router]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
