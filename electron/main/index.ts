@@ -292,17 +292,23 @@ app.on('before-quit', async () => {
   try {
     const dbModule = await import('./db/index.js');
     dbModule.closeDatabase();
-  } catch {}
+  } catch {
+    // Database may not be initialized
+  }
 
   try {
     const m = await import('./ipc/community-keys.js');
     m.stopHeartbeatSystem();
-  } catch {}
+  } catch {
+    // Community keys module may not be initialized
+  }
 
   try {
     const scheduledHandlers = await import('./ipc/scheduled.js');
     scheduledHandlers.stopAllScheduledTasks();
-  } catch {}
+  } catch {
+    // Scheduled handlers may not be initialized
+  }
 });
 
 // IPC handlers for window control

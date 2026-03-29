@@ -1,4 +1,5 @@
-import { readFile, writeFile, access, constants, readdir, mkdir, statSync } from 'fs/promises';
+import { readFile, writeFile, access, constants, readdir, mkdir } from 'fs/promises';
+import { statSync } from 'fs';
 import { join, dirname, isAbsolute, normalize, resolve } from 'path';
 import { homedir, tmpdir } from 'os';
 import process from 'process';
@@ -43,7 +44,7 @@ const BLOCKED_PATTERNS = [
   /\.pfx$/i,
   /\/\.ssh\//i,
   /\/\.gnupg\//i,
-  /\/\.config\/[^\/]*\/[^\/]*\.key/i,
+  /\.config\/[^\/]*\/[^\/]*\.key/i,
 ];
 
 /**
