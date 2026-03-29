@@ -170,7 +170,9 @@ async function handleDeskClawMessage(message) {
           // Use safer evaluation method with try-catch
           const result = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: new Function('try { ' + data.script + ' } catch(e) { return {error: e.message}; }'),
+            func: new Function(
+              'try { ' + data.script + ' } catch(e) { return {error: e.message}; }'
+            ),
           });
           sendToDeskClaw({
             type: 'success',

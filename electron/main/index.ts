@@ -128,7 +128,13 @@ function registerProtocolHandler() {
         filePath = indexPath;
       } else if (pathname.startsWith('_next/static/')) {
         // Serve static assets (_next/static/...)
-        filePath = path.join(appPath, 'next', '.next', 'static', pathname.substring('_next/static/'.length));
+        filePath = path.join(
+          appPath,
+          'next',
+          '.next',
+          'static',
+          pathname.substring('_next/static/'.length)
+        );
       } else {
         // Try serving as a page route: /chat → chat.html
         // First try with .html extension
@@ -180,7 +186,9 @@ app.whenReady().then(async () => {
   let getDatabase: typeof import('./db/index.js').getDatabase | null = null;
   let closeDatabase: typeof import('./db/index.js').closeDatabase | null = null;
   let scheduledHandlers: typeof import('./ipc/scheduled.js') | null = null;
-  let getPredictiveEngine: typeof import('./evolution/predictive-engine.js').getPredictiveEngine | null = null;
+  let getPredictiveEngine:
+    | typeof import('./evolution/predictive-engine.js').getPredictiveEngine
+    | null = null;
   let ipcLogger: typeof import('./lib/logger.js').ipcLogger | null = null;
 
   try {
@@ -346,7 +354,9 @@ ipcMain.on('window:show', () => {
 // ============================================================================
 
 function startEvolutionLearningLoop(
-  predictiveEngine: ReturnType<typeof import('./evolution/predictive-engine.js').getPredictiveEngine>,
+  predictiveEngine: ReturnType<
+    typeof import('./evolution/predictive-engine.js').getPredictiveEngine
+  >,
   ipcLogger: typeof import('./lib/logger.js').ipcLogger
 ): void {
   setTimeout(

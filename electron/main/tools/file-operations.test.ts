@@ -146,12 +146,7 @@ describe('File Operations', () => {
       });
 
       it('should identify key files as sensitive', () => {
-        const sensitivePaths = [
-          'private.key',
-          'cert.pem',
-          'config.p12',
-          'identity.pfx',
-        ];
+        const sensitivePaths = ['private.key', 'cert.pem', 'config.p12', 'identity.pfx'];
 
         sensitivePaths.forEach((p) => {
           const ext = path.extname(p).toLowerCase();

@@ -20,7 +20,10 @@ console.log('🔧 Fixing packaged modules...\n');
 const packagedNodeModules = join(__dirname, '../release/win-unpacked/resources/app/node_modules');
 
 // Paths to nested modules that should be removed
-const nestedBotbuilderStdlib = join(packagedNodeModules, 'botbuilder/node_modules/botbuilder-stdlib');
+const nestedBotbuilderStdlib = join(
+  packagedNodeModules,
+  'botbuilder/node_modules/botbuilder-stdlib'
+);
 const nestedBotbuilderCore = join(packagedNodeModules, 'botbuilder/node_modules/botbuilder-core');
 const topLevelBotbuilderStdlib = join(packagedNodeModules, 'botbuilder-stdlib');
 

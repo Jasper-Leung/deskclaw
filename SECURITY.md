@@ -28,6 +28,7 @@ If you discover a security vulnerability in this project, please follow these st
 DeskClaw includes several security features by design:
 
 ### Core Security
+
 - **Local-First Architecture**: All data is stored locally on your machine
 - **Encryption**: API keys and sensitive data are encrypted with AES-256-GCM
 - **No Telemetry**: We do not collect any usage data or telemetry
@@ -35,22 +36,26 @@ DeskClaw includes several security features by design:
 - **Sandboxed Environment**: Electron security policies are enforced
 
 ### Browser Security (v0.2.0+)
+
 - **Script Validation**: Browser extension validates all JavaScript before execution
 - **Pattern Blocking**: Dangerous patterns (fetch, eval, innerHTML, etc.) are blocked
 - **Length Limits**: Scripts are limited to 10,000 characters to prevent abuse
 - **URL Restrictions**: Cannot access chrome://, edge://, or other internal URLs
 
 ### Logging Security (v0.2.0+)
+
 - **Production Console Disabled**: console.log/debug/info are disabled in production builds
 - **Structured Logging**: Uses Pino for secure, structured logging with log levels
 - **Log Rotation**: Logs are stored in user data directory with proper management
 
 ### Automated Security (v0.2.0+)
+
 - **CI/CD Security Scanning**: npm audit runs on every pull request
 - **Snyk Integration**: Automated vulnerability scanning (optional, with SNYK_TOKEN)
 - **Dependency Audits**: Regular security audits of npm dependencies
 
 ### Data Mapping Security (v0.3.0+)
+
 - **Field Mapping**: Database fields are properly mapped between snake_case and camelCase to prevent data leakage through undefined properties
 - **Input Validation**: Provider and model data validated on both frontend and backend boundaries
 
@@ -79,12 +84,14 @@ If you're interested in conducting a security audit of DeskClaw, please open a r
 ## Recent Security Improvements
 
 ### v0.3.0
+
 - Fixed database field mapping to prevent data exposure through undefined properties
 - Added input validation for provider and model data
 - Fixed protocol handler to properly serve public assets
 - Improved dark theme handling to prevent UI information leakage
 
 ### v0.2.0
+
 - Added browser script validation and pattern blocking
 - Disabled console output in production builds
 - Added automated security scanning in CI/CD
