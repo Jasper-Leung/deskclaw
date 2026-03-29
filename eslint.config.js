@@ -27,6 +27,14 @@ export default [
       // Compiled JavaScript files from TypeScript
       'electron/**/*.js',
       'next/**/*.js',
+      // Temporary test and build script files
+      'test-*.js',
+      'test-*.cjs',
+      'scripts/*.js',
+      'scripts/*.bat',
+      'fix-html-paths.js',
+      'next/server-dev.js',
+      'electron/main/db/*.json',
     ],
   },
   // Base JS config
