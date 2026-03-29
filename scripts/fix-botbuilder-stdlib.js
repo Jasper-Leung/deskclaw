@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
+/* global process */
 
 /**
  * Fix for botbuilder-stdlib/lib/azureCoreHttpCompat missing index.js

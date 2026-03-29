@@ -44,7 +44,7 @@ const BLOCKED_PATTERNS = [
   /\.pfx$/i,
   /\/\.ssh\//i,
   /\/\.gnupg\//i,
-  /\.config\/[^\/]*\/[^\/]*\.key/i,
+  /\.config\/[^/]*\/[^/]*\.key/i,
 ];
 
 /**

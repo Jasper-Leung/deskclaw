@@ -1,3 +1,4 @@
+/* global console */
 const path = require('path');
 const url = 'file:///C:/Users/Test/AppData/Local/Temp/index-fixed.html/_next/static/chunks/webpack-xxx.js';
 
