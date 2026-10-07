@@ -24,6 +24,13 @@ import * as extensionBridgeHandlers from './extension-bridge.js';
 import * as quickChatHandlers from './quick-chat.js';
 import * as tokensHandlers from './tokens.js';
 import * as communityKeysHandlers from './community-keys.js';
+import * as apiServerHandlers from './api-server.js';
+import * as sessionSearchHandlers from './session-search.js';
+import { registerSmartRoutingHandlers } from './smart-routing.js';
+import * as contextRefsHandlers from './context-references.js';
+import * as credentialPoolHandlers from './credential-pool.js';
+import * as delegationHandlers from './delegation.js';
+import * as usageHandlers from './usage.js';
 import { registerGatewayIPCHandlers, setGatewayMainWindow } from './gateway.js';
 import { registerEvolutionHandlers } from './evolution.js';
 
@@ -72,6 +79,14 @@ export const registerIPCHandlers = (): void => {
   );
   ipcMain.handle('sessions:update', (_, id, data) => sessionsHandlers.updateSession(db, id, data));
   ipcMain.handle('sessions:delete', (_, id) => sessionsHandlers.deleteSession(db, id));
+
+  // Session Search
+  ipcMain.handle('sessions:search', (_, query, limit) =>
+    sessionSearchHandlers.searchSessions(db, query, limit)
+  );
+  ipcMain.handle('sessions:searchSuggestions', (_, prefix) =>
+    sessionSearchHandlers.getSearchSuggestions(db, prefix)
+  );
 
   // Workflows
   ipcMain.handle('workflows:list', () => workflowsHandlers.listWorkflows(db));
@@ -417,11 +432,70 @@ export const registerIPCHandlers = (): void => {
   // Evolution
   registerEvolutionHandlers();
 
+  // Smart Routing
+  registerSmartRoutingHandlers();
+
+  // Context References
+  ipcMain.handle('contextRefs:preview', (_, ref) =>
+    contextRefsHandlers.contextRefsPreview(db, ref)
+  );
+  ipcMain.handle('contextRefs:expand', (_, text) =>
+    contextRefsHandlers.contextRefsExpand(db, text)
+  );
+  ipcMain.handle('contextRefs:parse', (_, text) => contextRefsHandlers.contextRefsParse(db, text));
+
+  // Credential Pool
+  ipcMain.handle('credentials:list', (_, providerId) =>
+    credentialPoolHandlers.credentialsList(db, providerId)
+  );
+  ipcMain.handle('credentials:add', (_, data) => credentialPoolHandlers.credentialsAdd(db, data));
+  ipcMain.handle('credentials:remove', (_, id) => credentialPoolHandlers.credentialsRemove(db, id));
+  ipcMain.handle('credentials:update', (_, id, updates) =>
+    credentialPoolHandlers.credentialsUpdate(db, id, updates)
+  );
+  ipcMain.handle('credentials:status', (_, providerId) =>
+    credentialPoolHandlers.credentialsStatus(db, providerId)
+  );
+  ipcMain.handle('credentials:stats', () => credentialPoolHandlers.credentialsStats(db));
+  ipcMain.handle('credentials:reset', (_, id) => credentialPoolHandlers.credentialsReset(db, id));
+  ipcMain.handle('credentials:test', (_, id) => credentialPoolHandlers.credentialsTest(db, id));
+  ipcMain.handle('credentials:getConfig', () => credentialPoolHandlers.credentialsGetConfig(db));
+  ipcMain.handle('credentials:updateConfig', (_, config) =>
+    credentialPoolHandlers.credentialsUpdateConfig(db, config)
+  );
+
   // Tokens
   tokensHandlers.registerTokensHandlers();
 
+  // Delegation
+  ipcMain.handle('delegation:status', () => delegationHandlers.delegationStatus());
+  ipcMain.handle('delegation:cancel', () => delegationHandlers.delegationCancel());
+  ipcMain.handle('delegation:history', (_, limit) =>
+    delegationHandlers.delegationHistory(db, limit)
+  );
+  ipcMain.handle('delegation:getConfig', () => delegationHandlers.delegationGetConfig());
+  ipcMain.handle('delegation:updateConfig', (_, config) =>
+    delegationHandlers.delegationUpdateConfig(db, config)
+  );
+
   // Community Keys
   communityKeysHandlers.registerCommunityKeysHandlers();
+
+  // Usage Tracking
+  ipcMain.handle('usage:getStats', (_, options) => usageHandlers.usageGetStats(db, options));
+  ipcMain.handle('usage:getSession', (_, sessionId) =>
+    usageHandlers.usageGetSession(db, sessionId)
+  );
+
+  // API Server
+  ipcMain.handle('apiServer:start', (_, config?: Record<string, unknown>) =>
+    apiServerHandlers.apiServerStart(db, config as any)
+  );
+  ipcMain.handle('apiServer:stop', () => apiServerHandlers.apiServerStop());
+  ipcMain.handle('apiServer:status', () => apiServerHandlers.apiServerStatus());
+  ipcMain.handle('apiServer:updateConfig', (_, config) =>
+    apiServerHandlers.apiServerUpdateConfig(db, config)
+  );
 
   // Start heartbeat system for community keys
   void import('./community-keys.js').then((m) => m.startHeartbeatSystem());

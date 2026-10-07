@@ -3,6 +3,7 @@ import { executeTool, getAvailableTools, getTool, getToolsSchema } from '../tool
 import * as permissions from '../tools/permissions.js';
 import * as marketplace from '../tools/marketplace.js';
 import * as monitor from '../tools/monitor.js';
+import { redactSecrets } from '../lib/redact.js';
 
 // ============================================================================
 // LEGACY TOOL HANDLERS (Backward compatibility)
@@ -28,7 +29,18 @@ export const getToolSchema = () => {
 };
 
 export const executeToolRequest = async (name: string, params: Record<string, unknown>) => {
-  return await executeTool(name, params);
+  const result = await executeTool(name, params);
+  // Redact secrets from tool results before returning to renderer
+  if (result.result && typeof result.result === 'string') {
+    result.result = redactSecrets(result.result);
+  } else if (result.result && typeof result.result === 'object') {
+    const redacted = JSON.stringify(result.result);
+    result.result = JSON.parse(redactSecrets(redacted));
+  }
+  if (result.error) {
+    result.error = redactSecrets(result.error);
+  }
+  return result;
 };
 
 // ============================================================================

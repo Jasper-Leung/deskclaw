@@ -43,6 +43,18 @@ export const createSession = (db: Database.Database, data: CreateSessionData) =>
 
   stmt.run(id, data.agentId || null, data.title, JSON.stringify(data.messages || []), now, now);
 
+  // Insert messages into session_messages for FTS5
+  const msgStmt = db.prepare(
+    'INSERT INTO session_messages (session_id, role, content, message_index, timestamp) VALUES (?, ?, ?, ?, ?)'
+  );
+  const messages = data.messages || [];
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.content) {
+      msgStmt.run(id, msg.role, msg.content, i, msg.timestamp || now);
+    }
+  }
+
   return { id, ...data, messages: data.messages || [], createdAt: now, updatedAt: now };
 };
 
@@ -58,6 +70,20 @@ export const appendMessage = (db: Database.Database, id: string, message: Messag
   `);
 
   stmt.run(JSON.stringify(messages), Date.now(), id);
+
+  // Insert into session_messages for FTS5
+  const msgStmt = db.prepare(
+    'INSERT INTO session_messages (session_id, role, content, message_index, timestamp) VALUES (?, ?, ?, ?, ?)'
+  );
+  if (message.content) {
+    msgStmt.run(
+      id,
+      message.role,
+      message.content,
+      messages.length - 1,
+      message.timestamp || Date.now()
+    );
+  }
 
   return messages;
 };
@@ -107,6 +133,9 @@ export const updateSession = (
 };
 
 export const deleteSession = (db: Database.Database, id: string) => {
+  // Delete session_messages first (cascade should handle this, but be explicit)
+  db.prepare('DELETE FROM session_messages WHERE session_id = ?').run(id);
+
   const stmt = db.prepare('DELETE FROM sessions WHERE id = ?');
   const result = stmt.run(id);
 

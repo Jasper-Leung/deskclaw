@@ -1106,6 +1106,129 @@ const createTables = (db: Database.Database): void => {
 
   // Initialize preset workflows
   initializePresetWorkflows(db);
+
+  // ============================================================================
+  // SESSION SEARCH FTS5 TABLES
+  // ============================================================================
+
+  // Session messages table for FTS5 indexing
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS session_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      message_index INTEGER NOT NULL,
+      timestamp INTEGER NOT NULL
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_session_messages_session ON session_messages(session_id);
+    CREATE INDEX IF NOT EXISTS idx_session_messages_timestamp ON session_messages(timestamp);
+  `);
+
+  // FTS5 virtual table for full-text search
+  db.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS session_messages_fts USING fts5(
+      content,
+      content='session_messages',
+      content_rowid='id'
+    )
+  `);
+
+  // FTS5 triggers to keep index in sync
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS session_messages_ai AFTER INSERT ON session_messages BEGIN
+      INSERT INTO session_messages_fts(rowid, content) VALUES (new.id, new.content);
+    END
+  `);
+
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS session_messages_ad AFTER DELETE ON session_messages BEGIN
+      INSERT INTO session_messages_fts(session_messages_fts, rowid, content) VALUES('delete', old.id, old.content);
+    END
+  `);
+
+  db.exec(`
+    CREATE TRIGGER IF NOT EXISTS session_messages_au AFTER UPDATE ON session_messages BEGIN
+      INSERT INTO session_messages_fts(session_messages_fts, rowid, content) VALUES('delete', old.id, old.content);
+      INSERT INTO session_messages_fts(rowid, content) VALUES (new.id, new.content);
+    END
+  `);
+
+  // Backfill: parse existing sessions.messages_json into session_messages
+  try {
+    const existingSessions = db.prepare('SELECT id, messages_json FROM sessions').all() as any[];
+    const insertStmt = db.prepare(
+      'INSERT OR IGNORE INTO session_messages (session_id, role, content, message_index, timestamp) VALUES (?, ?, ?, ?, ?)'
+    );
+
+    for (const session of existingSessions) {
+      const messages = JSON.parse(session.messages_json || '[]');
+      for (let i = 0; i < messages.length; i++) {
+        const msg = messages[i];
+        if (msg.content) {
+          insertStmt.run(session.id, msg.role, msg.content, i, msg.timestamp || Date.now());
+        }
+      }
+    }
+    dbLogger.info('Backfilled session messages for FTS5');
+  } catch (error) {
+    dbLogger.error(error as Error, 'Failed to backfill session messages');
+  }
+
+  // ============================================================================
+  // PROVIDER CREDENTIALS TABLE (Multi-Key Failover Pool)
+  // ============================================================================
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS provider_credentials (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      api_key_encrypted TEXT NOT NULL,
+      priority INTEGER DEFAULT 0,
+      status TEXT NOT NULL CHECK(status IN ('active', 'cooldown', 'disabled', 'error')) DEFAULT 'active',
+      last_error TEXT,
+      last_error_at INTEGER,
+      request_count INTEGER DEFAULT 0,
+      cooldown_until INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_provider_credentials_provider_status ON provider_credentials(provider_id, status);
+    CREATE INDEX IF NOT EXISTS idx_provider_credentials_priority ON provider_credentials(provider_id, priority);
+  `);
+
+  // Usage tracking tables
+  try {
+    const { initUsageTables } =
+      require('../lib/usage-tracker.js') as typeof import('../lib/usage-tracker.js');
+    initUsageTables(db);
+  } catch {
+    // Usage tracker module not available yet, create tables directly
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS llm_usage (
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        model_id TEXT NOT NULL,
+        provider_protocol TEXT,
+        input_tokens INTEGER NOT NULL DEFAULT 0,
+        output_tokens INTEGER NOT NULL DEFAULT 0,
+        cost_usd REAL NOT NULL DEFAULT 0,
+        timestamp INTEGER NOT NULL
+      )
+    `);
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_llm_usage_model ON llm_usage(model_id);
+      CREATE INDEX IF NOT EXISTS idx_llm_usage_timestamp ON llm_usage(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_llm_usage_session ON llm_usage(session_id);
+    `);
+  }
 };
 
 // Database instance (singleton)

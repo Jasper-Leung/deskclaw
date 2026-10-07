@@ -5,6 +5,15 @@ import { streamText, generateText } from 'ai';
 import { decrypt } from '../db/index.js';
 import type { LLMRequest, Message } from '../../../shared/types/index.js';
 import { BrowserWindow } from 'electron';
+import { redactSecrets } from '../lib/redact.js';
+import {
+  selectCredential,
+  reportSuccess,
+  reportError,
+  getCredentialApiKey,
+} from '../keys/credential-pool.js';
+import { recordUsage } from '../lib/usage-tracker.js';
+import { countMessagesTokens } from '../lib/token-counter.js';
 
 interface ProviderConfig {
   protocol: 'openai' | 'anthropic' | 'ollama' | 'custom';
@@ -15,9 +24,9 @@ interface ProviderConfig {
 const getProviderForModel = (
   db: Database.Database,
   modelId: string
-): ProviderConfig & { modelId: string } => {
+): ProviderConfig & { modelId: string; credentialId?: string } => {
   const stmt = db.prepare(`
-    SELECT p.protocol, p.base_url, p.api_key_encrypted, m.model_id
+    SELECT p.protocol, p.base_url, p.api_key_encrypted, m.model_id, m.provider_id
     FROM models m
     JOIN providers p ON m.provider_id = p.id
     WHERE m.id = ?
@@ -29,6 +38,19 @@ const getProviderForModel = (
     throw new Error(`Model not found: ${modelId}`);
   }
 
+  // Try credential pool first
+  const poolCredential = selectCredential(db, result.provider_id);
+  if (poolCredential) {
+    return {
+      protocol: result.protocol,
+      baseUrl: result.base_url,
+      apiKeyEncrypted: getCredentialApiKey(poolCredential),
+      modelId: result.model_id,
+      credentialId: poolCredential.id,
+    };
+  }
+
+  // Fallback to provider's own key
   return {
     protocol: result.protocol,
     baseUrl: result.base_url,
@@ -83,8 +105,31 @@ export const chat = async (db: Database.Database, request: LLMRequest): Promise<
       model: client(providerConfig.modelId),
       messages: filteredMessages,
       temperature: request.temperature ?? 0.7,
-      maxTokens: request.maxTokens ?? 16384, // Increased for long tool calls
+      maxTokens: request.maxTokens ?? 16384,
     });
+
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+
+    // Record usage tracking
+    try {
+      const inputTokens = countMessagesTokens(filteredMessages, providerConfig.modelId);
+      const outputTokens = countMessagesTokens(
+        [{ role: 'assistant', content: result.text }],
+        providerConfig.modelId
+      );
+      recordUsage(db, {
+        id: `usage_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        modelId: providerConfig.modelId,
+        providerProtocol: providerConfig.protocol,
+        inputTokens,
+        outputTokens,
+      });
+    } catch {
+      // Usage tracking is non-critical
+    }
 
     return {
       role: 'assistant',
@@ -92,7 +137,14 @@ export const chat = async (db: Database.Database, request: LLMRequest): Promise<
       timestamp: Date.now(),
     };
   } catch (error: any) {
-    throw new Error(`LLM call failed: ${error.message}`);
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
+    throw new Error(`LLM call failed: ${redactSecrets(error.message)}`);
   }
 };
 
@@ -130,7 +182,9 @@ export const chatStream = async (
       maxTokens: request.maxTokens ?? 16384, // Increased for long tool calls
     });
 
+    let streamedText = '';
     for await (const chunk of result.textStream) {
+      streamedText += chunk;
       mainWindow?.webContents.send('llm:stream:chunk', {
         content: chunk,
         done: false,
@@ -141,11 +195,41 @@ export const chatStream = async (
       content: '',
       done: true,
     });
+
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+
+    // Record usage tracking (estimate output tokens from streamed text)
+    try {
+      const inputTokens = countMessagesTokens(filteredMessages, providerConfig.modelId);
+      const outputTokens = countMessagesTokens(
+        [{ role: 'assistant', content: streamedText }],
+        providerConfig.modelId
+      );
+      recordUsage(db, {
+        id: `usage_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        modelId: providerConfig.modelId,
+        providerProtocol: providerConfig.protocol,
+        inputTokens,
+        outputTokens,
+      });
+    } catch {
+      // Usage tracking is non-critical
+    }
   } catch (error: any) {
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
     mainWindow?.webContents.send('llm:stream:error', {
-      message: error.message,
+      message: redactSecrets(error.message),
     });
-    throw new Error(`LLM stream failed: ${error.message}`);
+    throw new Error(`LLM stream failed: ${redactSecrets(error.message)}`);
   }
 };
 
@@ -168,16 +252,52 @@ export async function* streamChat(
       return { role: 'assistant' as const, content: m.content };
     });
 
-  const result = await streamText({
-    model: client(providerConfig.modelId),
-    messages: filteredMessages,
-    temperature: request.temperature ?? 0.7,
-    maxTokens: request.maxTokens ?? 16384,
-  });
+  try {
+    const result = await streamText({
+      model: client(providerConfig.modelId),
+      messages: filteredMessages,
+      temperature: request.temperature ?? 0.7,
+      maxTokens: request.maxTokens ?? 16384,
+    });
 
-  for await (const chunk of result.textStream) {
-    yield { content: chunk, done: false };
+    let streamedText = '';
+    for await (const chunk of result.textStream) {
+      streamedText += chunk;
+      yield { content: chunk, done: false };
+    }
+
+    yield { content: '', done: true };
+
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+
+    // Record usage tracking
+    try {
+      const inputTokens = countMessagesTokens(filteredMessages, providerConfig.modelId);
+      const outputTokens = countMessagesTokens(
+        [{ role: 'assistant', content: streamedText }],
+        providerConfig.modelId
+      );
+      recordUsage(db, {
+        id: `usage_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        modelId: providerConfig.modelId,
+        providerProtocol: providerConfig.protocol,
+        inputTokens,
+        outputTokens,
+      });
+    } catch {
+      // Usage tracking is non-critical
+    }
+  } catch (error: any) {
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
+    throw error;
   }
-
-  yield { content: '', done: true };
 }

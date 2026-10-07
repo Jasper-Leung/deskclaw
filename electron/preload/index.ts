@@ -65,6 +65,10 @@ const electronAPI = {
     update: (id: string, data: { title?: string; messages?: Message[]; agentId?: string }) =>
       ipcRenderer.invoke('sessions:update' as IPCChannel, id, data),
     delete: (id: string) => ipcRenderer.invoke('sessions:delete' as IPCChannel, id),
+    search: (query: string, limit?: number) =>
+      ipcRenderer.invoke('sessions:search' as IPCChannel, query, limit),
+    searchSuggestions: (prefix: string) =>
+      ipcRenderer.invoke('sessions:searchSuggestions' as IPCChannel, prefix),
   },
 
   // Workflows
@@ -591,6 +595,74 @@ const electronAPI = {
     heartbeat: (id: string) => ipcRenderer.invoke('communityKeys:heartbeat' as IPCChannel, id),
     useKey: (communityId: string, providerProtocol?: string) =>
       ipcRenderer.invoke('communityKeys:useKey' as IPCChannel, communityId, providerProtocol),
+  },
+
+  // API Server (OpenAI-Compatible)
+  apiServer: {
+    start: (config?: { port?: number; host?: string; authToken?: string; enabled?: boolean }) =>
+      ipcRenderer.invoke('apiServer:start' as IPCChannel, config),
+    stop: () => ipcRenderer.invoke('apiServer:stop' as IPCChannel),
+    status: () => ipcRenderer.invoke('apiServer:status' as IPCChannel),
+    updateConfig: (config: {
+      port?: number;
+      host?: string;
+      authToken?: string;
+      enabled?: boolean;
+    }) => ipcRenderer.invoke('apiServer:updateConfig' as IPCChannel, config),
+  },
+
+  // Smart Routing
+  smartRouting: {
+    getConfig: () => ipcRenderer.invoke('smartRouting:getConfig' as IPCChannel),
+    updateConfig: (updates: Record<string, unknown>) =>
+      ipcRenderer.invoke('smartRouting:updateConfig' as IPCChannel, updates),
+    testRoute: (message: string, defaultModelId: string) =>
+      ipcRenderer.invoke('smartRouting:testRoute' as IPCChannel, message, defaultModelId),
+  },
+
+  // Context References (@file:, @folder:, @url:)
+  contextRefs: {
+    preview: (ref: string) => ipcRenderer.invoke('contextRefs:preview' as IPCChannel, ref),
+    expand: (text: string) => ipcRenderer.invoke('contextRefs:expand' as IPCChannel, text),
+    parse: (text: string) => ipcRenderer.invoke('contextRefs:parse' as IPCChannel, text),
+  },
+
+  // Credential Pool (Multi-Key Failover)
+  credentials: {
+    list: (providerId: string) => ipcRenderer.invoke('credentials:list' as IPCChannel, providerId),
+    add: (data: { providerId: string; label: string; apiKey: string; priority?: number }) =>
+      ipcRenderer.invoke('credentials:add' as IPCChannel, data),
+    remove: (id: string) => ipcRenderer.invoke('credentials:remove' as IPCChannel, id),
+    update: (
+      id: string,
+      updates: { label?: string; apiKey?: string; priority?: number; status?: string }
+    ) => ipcRenderer.invoke('credentials:update' as IPCChannel, id, updates),
+    status: (providerId: string) =>
+      ipcRenderer.invoke('credentials:status' as IPCChannel, providerId),
+    stats: () => ipcRenderer.invoke('credentials:stats' as IPCChannel),
+    reset: (id: string) => ipcRenderer.invoke('credentials:reset' as IPCChannel, id),
+    test: (id: string) => ipcRenderer.invoke('credentials:test' as IPCChannel, id),
+    getConfig: () => ipcRenderer.invoke('credentials:getConfig' as IPCChannel),
+    updateConfig: (config: Record<string, unknown>) =>
+      ipcRenderer.invoke('credentials:updateConfig' as IPCChannel, config),
+  },
+
+  // Sub-Agent Delegation
+  delegation: {
+    status: () => ipcRenderer.invoke('delegation:status' as IPCChannel),
+    cancel: () => ipcRenderer.invoke('delegation:cancel' as IPCChannel),
+    history: (limit?: number) => ipcRenderer.invoke('delegation:history' as IPCChannel, limit),
+    getConfig: () => ipcRenderer.invoke('delegation:getConfig' as IPCChannel),
+    updateConfig: (config: Record<string, unknown>) =>
+      ipcRenderer.invoke('delegation:updateConfig' as IPCChannel, config),
+  },
+
+  // Usage Tracking
+  usage: {
+    getStats: (options?: { since?: number; until?: number; sessionId?: string }) =>
+      ipcRenderer.invoke('usage:getStats' as IPCChannel, options),
+    getSession: (sessionId: string) =>
+      ipcRenderer.invoke('usage:getSession' as IPCChannel, sessionId),
   },
 };
 

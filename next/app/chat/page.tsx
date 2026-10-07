@@ -14,6 +14,8 @@ import {
   Copy,
   Check,
   FolderOpen,
+  Search,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -163,6 +165,10 @@ export default function ChatPage() {
     sessionId: string;
   } | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  // Session search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const workflowCleanupRef = useRef<(() => void) | null>(null);
@@ -1582,6 +1588,36 @@ export default function ChatPage() {
     setContextMenu(null);
   };
 
+  // Session search handler with debounce
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!value.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        if (window.electronAPI) {
+          const results = await window.electronAPI.sessions.search(value, 20);
+          setSearchResults(results || []);
+        }
+      } catch (error) {
+        console.error('Search failed:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+  }, []);
+
   const clearAllSessions = async () => {
     if (!confirm('Are you sure you want to delete ALL conversations? This cannot be undone.'))
       return;
@@ -2560,43 +2596,84 @@ export default function ChatPage() {
                 </Button>
               </div>
             </div>
-            <ScrollArea className="h-[calc(100vh-200px)]">
+            {/* Session Search Bar */}
+            <div className="relative mb-3">
+              <Search className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="flex h-8 w-full rounded-md border border-input bg-background px-7 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            {/* Search Results or Session List */}
+            <ScrollArea className="h-[calc(100vh-240px)]">
               <div className="space-y-1">
-                {sessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className={`group relative flex items-center gap-2 rounded-lg p-2 pr-16 cursor-pointer hover:bg-accent ${
-                      currentSessionId === session.id ? 'bg-accent' : ''
-                    }`}
-                    onClick={() => loadSession(session.id)}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setContextMenu({
-                        x: e.clientX,
-                        y: e.clientY,
-                        sessionId: session.id,
-                      });
-                    }}
-                  >
-                    <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <span className="text-sm truncate flex-1" title={session.title}>
-                      {session.title}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 shrink-0 absolute right-8 opacity-100 hover:bg-destructive/90 hover:text-destructive-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteSession(session.id);
+                {searchQuery ? (
+                  isSearching ? (
+                    <p className="text-xs text-muted-foreground text-center py-4">Searching...</p>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((result: any) => (
+                      <div
+                        key={`${result.sessionId}-${result.timestamp}`}
+                        className="rounded-lg p-2 cursor-pointer hover:bg-accent"
+                        onClick={() => loadSession(result.sessionId)}
+                      >
+                        <p className="text-xs font-medium truncate">{result.sessionTitle}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                          {result.snippet?.replace(/>>>/g, '').replace(/<<</g, '')}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">No results</p>
+                  )
+                ) : (
+                  sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className={`group relative flex items-center gap-2 rounded-lg p-2 pr-16 cursor-pointer hover:bg-accent ${
+                        currentSessionId === session.id ? 'bg-accent' : ''
+                      }`}
+                      onClick={() => loadSession(session.id)}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          x: e.clientX,
+                          y: e.clientY,
+                          sessionId: session.id,
+                        });
                       }}
-                      title="Delete conversation"
                     >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-                {sessions.length === 0 && (
+                      <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <span className="text-sm truncate flex-1" title={session.title}>
+                        {session.title}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 shrink-0 absolute right-8 opacity-100 hover:bg-destructive/90 hover:text-destructive-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSession(session.id);
+                        }}
+                        title="Delete conversation"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+                {!searchQuery && sessions.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No conversations yet
                   </p>

@@ -79,3 +79,6 @@ MEMORY_INTEGRATION_SUMMARY.md
 test-integration.js
 wait-for-next.*
 nul
+# 构建/测试输出产物
+build-output.txt
+test-output.txt

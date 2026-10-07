@@ -71,6 +71,10 @@ const pinoConfig: pino.LoggerOptions = {
   serializers: {
     error: errSerializer,
   },
+  redact: {
+    paths: ['apiKey', 'apiKeyEncrypted', '*.apiKey', '*.token', '*.secret', '*.password'],
+    censor: '***REDACTED***',
+  },
   // In development, use pretty print (optional, requires pino-pretty)
   ...(process.env.NODE_ENV === 'development' && {
     transport: {

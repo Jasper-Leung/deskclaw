@@ -5,6 +5,22 @@ import { streamText, generateText } from 'ai';
 import { decrypt } from '../db/index.js';
 import type { LLMRequest } from '../../../shared/types/index.js';
 import { getModelContextLimit, countMessagesTokens } from '../lib/token-counter.js';
+import { redactSecrets } from '../lib/redact.js';
+import {
+  analyzeAndRoute,
+  getDefaultSmartRoutingConfig,
+  type SmartRoutingConfig,
+} from '../lib/smart-routing.js';
+import { expandReferences, parseReferences } from '../lib/context-references.js';
+import {
+  selectCredential,
+  reportSuccess,
+  reportError,
+  getCredentialApiKey,
+} from '../keys/credential-pool.js';
+import { compressContext } from '../lib/context-compressor.js';
+import { autoTitleSession } from '../lib/title-generator.js';
+import { recordUsage, calculateCost } from '../lib/usage-tracker.js';
 
 interface Message {
   role: 'system' | 'user' | 'assistant' | 'tool' | 'tool_result' | 'tool_error';
@@ -31,9 +47,9 @@ interface MemoryInjectionOptions {
 const getProviderForModel = (
   db: Database.Database,
   modelId: string
-): ProviderConfig & { modelId: string } => {
+): ProviderConfig & { modelId: string; credentialId?: string } => {
   const stmt = db.prepare(`
-    SELECT p.protocol, p.base_url, p.api_key_encrypted, m.model_id
+    SELECT p.protocol, p.base_url, p.api_key_encrypted, m.model_id, m.provider_id
     FROM models m
     JOIN providers p ON m.provider_id = p.id
     WHERE m.id = ?
@@ -45,9 +61,21 @@ const getProviderForModel = (
     throw new Error(`Model not found: ${modelId}`);
   }
 
+  // Try credential pool first
+  const poolCredential = selectCredential(db, result.provider_id);
+  if (poolCredential) {
+    return {
+      protocol: result.protocol,
+      baseUrl: result.base_url,
+      apiKeyEncrypted: getCredentialApiKey(poolCredential),
+      modelId: result.model_id,
+      credentialId: poolCredential.id,
+    };
+  }
+
   return {
     protocol: result.protocol,
-    baseUrl: result.baseUrl,
+    baseUrl: result.base_url,
     apiKeyEncrypted: result.api_key_encrypted,
     modelId: result.model_id,
   };
@@ -112,6 +140,58 @@ async function injectMemoriesIfNeeded(
   return { messages: messagesWithMemories as Message[] };
 }
 
+/**
+ * Apply smart routing to determine the best model for the request
+ */
+function applySmartRouting(db: Database.Database, request: LLMRequest): string {
+  try {
+    // Get smart routing config from settings
+    const row = db
+      .prepare("SELECT value FROM settings WHERE key = 'smartRoutingConfig'")
+      .get() as any;
+    if (!row) return request.model;
+
+    const config: SmartRoutingConfig = {
+      ...getDefaultSmartRoutingConfig(),
+      ...JSON.parse(row.value),
+    };
+    if (!config.enabled || !config.cheapModelId) return request.model;
+
+    // Find last user message
+    const lastUserMsg = [...request.messages].reverse().find((m) => m.role === 'user');
+    if (!lastUserMsg) return request.model;
+
+    const decision = analyzeAndRoute(lastUserMsg.content, config, request.model);
+    return decision.selectedModelId;
+  } catch {
+    return request.model;
+  }
+}
+
+/**
+ * Expand context references in the last user message
+ */
+async function expandContextRefsInMessages(messages: Message[]): Promise<Message[]> {
+  // Find last user message
+  const lastUserIdx = [...messages]
+    .map((m, i) => ({ m, i }))
+    .reverse()
+    .find(({ m }) => m.role === 'user');
+  if (!lastUserIdx) return messages;
+
+  const lastUserMsg = lastUserIdx.m;
+  if (!parseReferences(lastUserMsg.content).length) return messages;
+
+  try {
+    const { expandedText } = await expandReferences(lastUserMsg.content);
+    const updated = [...messages];
+    updated[lastUserIdx.i] = { ...lastUserMsg, content: expandedText };
+    return updated;
+  } catch {
+    return messages;
+  }
+}
+
 export const chat = async (
   db: Database.Database,
   request: LLMRequest,
@@ -124,12 +204,18 @@ export const chat = async (
     memoryOptions
   );
 
-  const providerConfig = getProviderForModel(db, request.model);
+  // Expand context references (@file:, @folder:, @url:)
+  const messagesWithRefs = await expandContextRefsInMessages(messagesWithMemories);
+
+  // Apply smart routing
+  const routedModelId = applySmartRouting(db, request);
+
+  const providerConfig = getProviderForModel(db, routedModelId);
   const client = createClient(providerConfig);
 
   try {
     // Filter and format messages for the LLM
-    const filteredMessages = messagesWithMemories
+    let filteredMessages = messagesWithRefs
       .filter((m) => m.role !== 'tool' && m.role !== 'tool_error')
       .map((m) => {
         if (m.role === 'system') {
@@ -143,6 +229,19 @@ export const chat = async (
         }
         return { role: 'assistant' as const, content: m.content };
       });
+
+    // Context compression when approaching token limit
+    try {
+      const compressionResult = await compressContext(
+        filteredMessages as any,
+        providerConfig.modelId
+      );
+      if (compressionResult.wasCompressed) {
+        filteredMessages = compressionResult.messages as any;
+      }
+    } catch {
+      // Compression failed, continue with original messages
+    }
 
     // Calculate available tokens for output
     // Reserve space for: input messages + response format overhead
@@ -165,13 +264,51 @@ export const chat = async (
       maxTokens: actualMaxTokens,
     });
 
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+
+    // Record usage tracking
+    try {
+      const outputTokens = countMessagesTokens(
+        [{ role: 'assistant', content: result.text }],
+        providerConfig.modelId
+      );
+      recordUsage(db, {
+        id: `usage_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        modelId: providerConfig.modelId,
+        providerProtocol: providerConfig.protocol,
+        inputTokens,
+        outputTokens,
+      });
+    } catch {
+      // Usage tracking is non-critical
+    }
+
+    // Auto-title session (fire-and-forget)
+    const lastUserMsg = [...messagesWithRefs].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg && result.text) {
+      const sessionId = (request as any).sessionId;
+      if (sessionId) {
+        autoTitleSession(sessionId, lastUserMsg.content, result.text).catch(() => {});
+      }
+    }
+
     return {
       role: 'assistant',
       content: result.text,
       timestamp: Date.now(),
     };
   } catch (error: any) {
-    throw new Error(`LLM call failed: ${error.message}`);
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
+    throw new Error(`LLM call failed: ${redactSecrets(error.message)}`);
   }
 };
 
@@ -188,12 +325,18 @@ export const chatStream = async (
     memoryOptions
   );
 
-  const providerConfig = getProviderForModel(db, request.model);
+  // Expand context references (@file:, @folder:, @url:)
+  const messagesWithRefs = await expandContextRefsInMessages(messagesWithMemories);
+
+  // Apply smart routing
+  const routedModelId = applySmartRouting(db, request);
+
+  const providerConfig = getProviderForModel(db, routedModelId);
   const client = createClient(providerConfig);
 
   try {
     // Filter and format messages for the LLM
-    const filteredMessages = messagesWithMemories
+    let filteredMessages = messagesWithRefs
       .filter((m) => m.role !== 'tool' && m.role !== 'tool_error')
       .map((m) => {
         if (m.role === 'system') {
@@ -207,6 +350,19 @@ export const chatStream = async (
         }
         return { role: 'assistant' as const, content: m.content };
       });
+
+    // Context compression when approaching token limit
+    try {
+      const compressionResult = await compressContext(
+        filteredMessages as any,
+        providerConfig.modelId
+      );
+      if (compressionResult.wasCompressed) {
+        filteredMessages = compressionResult.messages as any;
+      }
+    } catch {
+      // Compression failed, continue with original messages
+    }
 
     // Calculate available tokens for output
     const modelContextLimit = getModelContextLimit(providerConfig.modelId);
@@ -227,7 +383,9 @@ export const chatStream = async (
       maxTokens: actualMaxTokens,
     });
 
+    let streamedText = '';
     for await (const chunk of result.textStream) {
+      streamedText += chunk;
       mainWindow?.webContents.send('llm:stream:chunk', {
         content: chunk,
         done: false,
@@ -238,11 +396,49 @@ export const chatStream = async (
       content: '',
       done: true,
     });
+
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+
+    // Record usage tracking (estimate output tokens)
+    try {
+      const outputTokens = countMessagesTokens(
+        [{ role: 'assistant', content: streamedText }],
+        providerConfig.modelId
+      );
+      recordUsage(db, {
+        id: `usage_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        modelId: providerConfig.modelId,
+        providerProtocol: providerConfig.protocol,
+        inputTokens,
+        outputTokens,
+      });
+    } catch {
+      // Usage tracking is non-critical
+    }
+
+    // Auto-title session (fire-and-forget)
+    const lastUserMsg = [...messagesWithRefs].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg && streamedText) {
+      const sessionId = (request as any).sessionId;
+      if (sessionId) {
+        autoTitleSession(sessionId, lastUserMsg.content, streamedText).catch(() => {});
+      }
+    }
   } catch (error: any) {
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
     mainWindow?.webContents.send('llm:stream:error', {
-      message: error.message,
+      message: redactSecrets(error.message),
     });
-    throw new Error(`LLM stream failed: ${error.message}`);
+    throw new Error(`LLM stream failed: ${redactSecrets(error.message)}`);
   }
 };
 
@@ -258,10 +454,16 @@ export async function* streamChat(
     memoryOptions
   );
 
-  const providerConfig = getProviderForModel(db, request.model);
+  // Expand context references
+  const messagesWithRefs = await expandContextRefsInMessages(messagesWithMemories);
+
+  // Apply smart routing
+  const routedModelId = applySmartRouting(db, request);
+
+  const providerConfig = getProviderForModel(db, routedModelId);
   const client = createClient(providerConfig);
 
-  const filteredMessages = messagesWithMemories
+  const filteredMessages = messagesWithRefs
     .filter((m) => m.role !== 'tool' && m.role !== 'tool_error')
     .map((m) => {
       if (m.role === 'system') {
@@ -273,18 +475,34 @@ export async function* streamChat(
       return { role: 'assistant' as const, content: m.content };
     });
 
-  const result = await streamText({
-    model: client(providerConfig.modelId),
-    messages: filteredMessages,
-    temperature: request.temperature ?? 0.7,
-    maxTokens: request.maxTokens ?? 16384,
-  });
+  try {
+    const result = await streamText({
+      model: client(providerConfig.modelId),
+      messages: filteredMessages,
+      temperature: request.temperature ?? 0.7,
+      maxTokens: request.maxTokens ?? 16384,
+    });
 
-  for await (const chunk of result.textStream) {
-    yield { content: chunk, done: false };
+    for await (const chunk of result.textStream) {
+      yield { content: chunk, done: false };
+    }
+
+    yield { content: '', done: true };
+
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+  } catch (error: any) {
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
+    throw error;
   }
-
-  yield { content: '', done: true };
 }
 
 /**
@@ -302,11 +520,17 @@ export const chatWithMemoryContext = async (
     memoryOptions
   );
 
-  const providerConfig = getProviderForModel(db, request.model);
+  // Expand context references
+  const messagesWithRefs = await expandContextRefsInMessages(messagesWithMemories);
+
+  // Apply smart routing
+  const routedModelId = applySmartRouting(db, request);
+
+  const providerConfig = getProviderForModel(db, routedModelId);
   const client = createClient(providerConfig);
 
   try {
-    const filteredMessages = messagesWithMemories
+    const filteredMessages = messagesWithRefs
       .filter((m) => m.role !== 'tool' && m.role !== 'tool_error')
       .map((m) => {
         if (m.role === 'system') {
@@ -328,6 +552,11 @@ export const chatWithMemoryContext = async (
       maxTokens: request.maxTokens ?? 16384,
     });
 
+    // Report success to credential pool
+    if (providerConfig.credentialId) {
+      reportSuccess(db, providerConfig.credentialId);
+    }
+
     return {
       message: {
         role: 'assistant',
@@ -337,7 +566,14 @@ export const chatWithMemoryContext = async (
       memoryContext,
     };
   } catch (error: any) {
-    throw new Error(`LLM call failed: ${error.message}`);
+    // Report error to credential pool
+    if (providerConfig.credentialId) {
+      reportError(db, providerConfig.credentialId, {
+        statusCode: error.statusCode || error.status,
+        message: error.message,
+      });
+    }
+    throw new Error(`LLM call failed: ${redactSecrets(error.message)}`);
   }
 };
 

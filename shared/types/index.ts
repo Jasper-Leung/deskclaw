@@ -232,7 +232,43 @@ export type IPCChannel =
   | 'mcpBrowser:scroll'
   | 'mcpBrowser:scrollToEnd'
   | 'mcpBrowser:evaluate'
-  | 'mcpBrowser:waitForSelector';
+  | 'mcpBrowser:waitForSelector'
+  // API Server
+  | 'apiServer:start'
+  | 'apiServer:stop'
+  | 'apiServer:status'
+  | 'apiServer:updateConfig'
+  // Session Search
+  | 'sessions:search'
+  | 'sessions:searchSuggestions'
+  // Smart Routing
+  | 'smartRouting:getConfig'
+  | 'smartRouting:updateConfig'
+  | 'smartRouting:testRoute'
+  // Context References
+  | 'contextRefs:preview'
+  | 'contextRefs:expand'
+  | 'contextRefs:parse'
+  // Credential Pool
+  | 'credentials:list'
+  | 'credentials:add'
+  | 'credentials:remove'
+  | 'credentials:update'
+  | 'credentials:status'
+  | 'credentials:stats'
+  | 'credentials:reset'
+  | 'credentials:test'
+  | 'credentials:getConfig'
+  | 'credentials:updateConfig'
+  // Delegation
+  | 'delegation:status'
+  | 'delegation:cancel'
+  | 'delegation:history'
+  | 'delegation:getConfig'
+  | 'delegation:updateConfig'
+  // Usage Tracking
+  | 'usage:getStats'
+  | 'usage:getSession';
 
 export interface LLMRequest {
   model: string;

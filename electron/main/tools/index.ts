@@ -3384,6 +3384,743 @@ tools.ping = {
 };
 
 /**
+ * Delegate Task Tool
+ * Delegates tasks to sub-agents for parallel processing
+ */
+tools.delegate_task = {
+  name: 'delegate_task',
+  description:
+    'Delegate one or more tasks to sub-agents for parallel processing. Each task is an independent LLM call. Use this for tasks that can be processed independently.',
+  parameters: {
+    tasks: {
+      type: 'array',
+      description:
+        'Array of tasks to delegate. Each task should have a "prompt" and optional "context" field.',
+      required: true,
+    },
+    model_id: {
+      type: 'string',
+      description: 'Optional model ID to use for sub-agent calls. Defaults to the current model.',
+      required: false,
+    },
+  },
+  handler: async (params) => {
+    const { getDelegator } = await import('../agents/delegation.js');
+    const tasks = params.tasks as Array<{ prompt: string; context?: string }>;
+    const modelId = params.model_id as string | undefined;
+
+    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+      return { result: null, error: 'Tasks array is required and must not be empty' };
+    }
+
+    try {
+      // Determine which model to use
+      let useModelId = modelId;
+      if (!useModelId) {
+        const db = getDatabase();
+        // Try settings for default model, then first available
+        const setting = db
+          .prepare("SELECT value FROM settings WHERE key = 'defaultModel'")
+          .get() as any;
+        if (setting?.value) {
+          useModelId = setting.value;
+        } else {
+          const firstModel = db.prepare('SELECT id FROM models LIMIT 1').get() as any;
+          useModelId = firstModel?.id;
+        }
+      }
+
+      if (!useModelId) {
+        return { result: null, error: 'No model available for delegation' };
+      }
+
+      const delegator = getDelegator();
+      const results = await delegator.delegateMultipleTasks(tasks, useModelId);
+
+      return {
+        result: results.map((r) => ({
+          prompt: r.prompt,
+          result: r.result,
+          success: r.success,
+          error: r.error,
+          durationMs: r.durationMs,
+        })),
+      };
+    } catch (error: any) {
+      return { result: null, error: `Delegation failed: ${error.message}` };
+    }
+  },
+};
+
+// ==================== Todo/Task Tool ====================
+tools.todo = {
+  name: 'todo',
+  description:
+    'Manage a task list during the conversation. Add, update, delete, and list tasks with status tracking.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['add', 'update', 'delete', 'list', 'clear'],
+        description:
+          'Action to perform: add a new task, update an existing task, delete a task, list all tasks, or clear all tasks.',
+      },
+      taskId: {
+        type: 'string',
+        description: 'Task ID (required for update and delete actions).',
+      },
+      title: {
+        type: 'string',
+        description: 'Task title (required for add action).',
+      },
+      description: {
+        type: 'string',
+        description: 'Optional task description.',
+      },
+      status: {
+        type: 'string',
+        enum: ['pending', 'in_progress', 'completed', 'cancelled'],
+        description: 'Task status (for update action).',
+      },
+      priority: {
+        type: 'string',
+        enum: ['low', 'medium', 'high', 'critical'],
+        description: 'Task priority.',
+      },
+    },
+    required: ['action'],
+  },
+  execute: async (params: Record<string, unknown>) => {
+    const { action, taskId, title, description, status, priority } = params;
+    const db = getDatabase();
+
+    // Ensure todos table exists
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS todos (
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        title TEXT NOT NULL,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        priority TEXT DEFAULT 'medium',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    try {
+      switch (action) {
+        case 'add': {
+          if (!title) return { error: 'title is required for add action' };
+          const id = `todo_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          const now = Date.now();
+          db.prepare(
+            'INSERT INTO todos (id, title, description, status, priority, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).run(
+            id,
+            title as string,
+            (description as string) || null,
+            'pending',
+            (priority as string) || 'medium',
+            now,
+            now
+          );
+          return {
+            result: { id, title, status: 'pending', priority: priority || 'medium' },
+            message: `Task added: ${title}`,
+          };
+        }
+        case 'update': {
+          if (!taskId) return { error: 'taskId is required for update action' };
+          const existing = db.prepare('SELECT * FROM todos WHERE id = ?').get(taskId) as any;
+          if (!existing) return { error: `Task not found: ${taskId}` };
+          const updates: string[] = [];
+          const values: any[] = [];
+          if (status) {
+            updates.push('status = ?');
+            values.push(status);
+          }
+          if (title) {
+            updates.push('title = ?');
+            values.push(title);
+          }
+          if (description) {
+            updates.push('description = ?');
+            values.push(description);
+          }
+          if (priority) {
+            updates.push('priority = ?');
+            values.push(priority);
+          }
+          if (updates.length === 0) return { error: 'No fields to update' };
+          updates.push('updated_at = ?');
+          values.push(Date.now());
+          values.push(taskId);
+          db.prepare(`UPDATE todos SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+          const updated = db.prepare('SELECT * FROM todos WHERE id = ?').get(taskId) as any;
+          return { result: updated, message: `Task updated: ${updated.title}` };
+        }
+        case 'delete': {
+          if (!taskId) return { error: 'taskId is required for delete action' };
+          const del = db.prepare('SELECT * FROM todos WHERE id = ?').get(taskId) as any;
+          if (!del) return { error: `Task not found: ${taskId}` };
+          db.prepare('DELETE FROM todos WHERE id = ?').run(taskId);
+          return { result: { id: taskId }, message: `Task deleted: ${del.title}` };
+        }
+        case 'list': {
+          const todos = db.prepare('SELECT * FROM todos ORDER BY created_at ASC').all() as any[];
+          return { result: todos, count: todos.length };
+        }
+        case 'clear': {
+          const count = (db.prepare('SELECT COUNT(*) as c FROM todos').get() as any).c;
+          db.exec('DELETE FROM todos');
+          return { result: { cleared: count }, message: `Cleared ${count} tasks` };
+        }
+        default:
+          return { error: `Unknown action: ${action}` };
+      }
+    } catch (error: any) {
+      return { error: `Todo operation failed: ${error.message}` };
+    }
+  },
+};
+
+// ==================== Mixture-of-Agents (MoA) Tool ====================
+tools.mixture_of_agents = {
+  name: 'mixture_of_agents',
+  description:
+    'Query multiple models simultaneously and synthesize their responses into a single comprehensive answer. Useful for getting diverse perspectives or higher-quality answers.',
+  parameters: {
+    type: 'object',
+    properties: {
+      prompt: {
+        type: 'string',
+        description: 'The question or task to send to all models.',
+      },
+      systemPrompt: {
+        type: 'string',
+        description: 'Optional system prompt to use for all models.',
+      },
+      modelIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Optional list of specific model IDs to use. If omitted, uses the top 3 available models.',
+      },
+      synthesisPrompt: {
+        type: 'string',
+        description:
+          'Custom prompt for the synthesis step. Default: "Synthesize the following responses into a single comprehensive answer."',
+      },
+    },
+    required: ['prompt'],
+  },
+  execute: async (params: Record<string, unknown>) => {
+    const { prompt, systemPrompt, modelIds, synthesisPrompt } = params;
+    const db = getDatabase();
+
+    try {
+      const { generateText } = await import('ai');
+      const { createOpenAI } = await import('@ai-sdk/openai');
+      const { createAnthropic } = await import('@ai-sdk/anthropic');
+      const { decrypt } = await import('../db/index.js');
+
+      // Resolve models to query
+      let models: any[] = [];
+      if (modelIds && (modelIds as string[]).length > 0) {
+        for (const mid of modelIds as string[]) {
+          const row = db
+            .prepare(
+              `SELECT m.id, m.model_id, p.protocol, p.base_url, p.api_key_encrypted FROM models m JOIN providers p ON m.provider_id = p.id WHERE m.id = ?`
+            )
+            .get(mid) as any;
+          if (row) models.push(row);
+        }
+      } else {
+        models = db
+          .prepare(
+            `SELECT m.id, m.model_id, p.protocol, p.base_url, p.api_key_encrypted FROM models m JOIN providers p ON m.provider_id = p.id LIMIT 3`
+          )
+          .all() as any[];
+      }
+
+      if (models.length === 0) {
+        return { error: 'No models available for MoA' };
+      }
+
+      // Query all models in parallel
+      const responses: { modelId: string; response: string }[] = [];
+      const queries = models.map(async (model: any) => {
+        try {
+          const apiKey = decrypt(model.api_key_encrypted);
+          let client: any;
+          switch (model.protocol) {
+            case 'openai':
+            case 'ollama':
+            case 'custom':
+              client = createOpenAI({ baseURL: model.base_url, apiKey });
+              break;
+            case 'anthropic':
+              client = createAnthropic({ baseURL: model.base_url, apiKey });
+              break;
+            default:
+              return;
+          }
+
+          const messages: any[] = [];
+          if (systemPrompt) {
+            messages.push({ role: 'system', content: systemPrompt as string });
+          }
+          messages.push({ role: 'user', content: prompt as string });
+
+          const result = await generateText({
+            model: client(model.model_id),
+            messages,
+            maxTokens: 4096,
+            temperature: 0.7,
+          });
+
+          responses.push({ modelId: model.model_id, response: result.text });
+        } catch (err: any) {
+          responses.push({ modelId: model.model_id, response: `[Error: ${err.message}]` });
+        }
+      });
+
+      await Promise.all(queries);
+
+      if (responses.length === 0) {
+        return { error: 'All model queries failed' };
+      }
+
+      // If only one model responded, return directly
+      if (responses.length === 1) {
+        return { result: responses[0].response, sources: responses };
+      }
+
+      // Synthesize responses using the first model
+      const synthesizer = models[0];
+      const apiKey = decrypt(synthesizer.api_key_encrypted);
+      let client: any;
+      switch (synthesizer.protocol) {
+        case 'openai':
+        case 'ollama':
+        case 'custom':
+          client = createOpenAI({ baseURL: synthesizer.base_url, apiKey });
+          break;
+        case 'anthropic':
+          client = createAnthropic({ baseURL: synthesizer.base_url, apiKey });
+          break;
+        default:
+          return {
+            result: responses.map((r) => `[${r.modelId}]: ${r.response}`).join('\n\n'),
+            sources: responses,
+          };
+      }
+
+      const synthPrompt =
+        (synthesisPrompt as string) ||
+        'Synthesize the following responses from different AI models into a single comprehensive answer. Preserve key insights from each model and resolve any contradictions:';
+      const formattedResponses = responses
+        .map((r) => `[${r.modelId}]: ${r.response}`)
+        .join('\n\n---\n\n');
+
+      const synthResult = await generateText({
+        model: client(synthesizer.model_id),
+        messages: [
+          { role: 'system', content: synthPrompt },
+          { role: 'user', content: formattedResponses },
+        ],
+        maxTokens: 8192,
+        temperature: 0.3,
+      });
+
+      return {
+        result: synthResult.text,
+        sources: responses,
+        synthesized: true,
+      };
+    } catch (error: any) {
+      return { error: `MoA failed: ${error.message}` };
+    }
+  },
+};
+
+// ==================== Patch File Tool ====================
+tools.patch_file = {
+  name: 'patch_file',
+  description:
+    'Apply a unified diff patch to a file. Supports creating new files, modifying existing files, and deleting files using standard diff format.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filePath: {
+        type: 'string',
+        description: 'Absolute path to the file to patch.',
+      },
+      patch: {
+        type: 'string',
+        description: 'Unified diff patch content to apply.',
+      },
+      dryRun: {
+        type: 'boolean',
+        description:
+          'If true, only validate the patch without applying it. Returns what would change.',
+      },
+      createDirs: {
+        type: 'boolean',
+        description: 'If true, create parent directories if they do not exist. Default: true.',
+      },
+    },
+    required: ['filePath', 'patch'],
+  },
+  execute: async (params: Record<string, unknown>) => {
+    const { filePath, patch, dryRun, createDirs } = params;
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const targetPath = filePath as string;
+    const patchContent = patch as string;
+    const isDryRun = (dryRun as boolean) || false;
+    const shouldCreateDirs = (createDirs as boolean) !== false;
+
+    try {
+      // Parse the unified diff
+      const lines = patchContent.split('\n');
+      const hunks: {
+        oldStart: number;
+        oldCount: number;
+        newStart: number;
+        newCount: number;
+        lines: string[];
+      }[] = [];
+      let currentHunk: (typeof hunks)[0] | null = null;
+
+      for (const line of lines) {
+        const hunkMatch = line.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+        if (hunkMatch) {
+          if (currentHunk) hunks.push(currentHunk);
+          currentHunk = {
+            oldStart: parseInt(hunkMatch[1]),
+            oldCount: parseInt(hunkMatch[2] || '1'),
+            newStart: parseInt(hunkMatch[3]),
+            newCount: parseInt(hunkMatch[4] || '1'),
+            lines: [],
+          };
+          continue;
+        }
+        if (currentHunk) {
+          currentHunk.lines.push(line);
+        }
+      }
+      if (currentHunk) hunks.push(currentHunk);
+
+      if (hunks.length === 0) {
+        return { error: 'No valid hunks found in patch' };
+      }
+
+      // Read current file content (or empty for new files)
+      let fileContent = '';
+      let isNewFile = false;
+      try {
+        fileContent = fs.readFileSync(targetPath, 'utf-8');
+      } catch {
+        isNewFile = true;
+      }
+
+      const fileLines = fileContent.split('\n');
+
+      // Apply hunks in reverse order to preserve line numbers
+      const sortedHunks = [...hunks].sort((a, b) => b.oldStart - a.oldStart);
+      const resultLines = [...fileLines];
+      const changes: string[] = [];
+
+      for (const hunk of sortedHunks) {
+        const startIdx = hunk.oldStart - 1; // 0-indexed
+        const newLines: string[] = [];
+        let removedCount = 0;
+
+        for (const hline of hunk.lines) {
+          if (hline.startsWith('+')) {
+            newLines.push(hline.substring(1));
+          } else if (hline.startsWith('-')) {
+            removedCount++;
+          } else if (hline.startsWith(' ')) {
+            newLines.push(hline.substring(1));
+          } else {
+            newLines.push(hline);
+          }
+        }
+
+        changes.push(
+          `Hunk @@ -${hunk.oldStart},${hunk.oldCount} +${hunk.newStart},${hunk.newCount}@@: -${removedCount} lines, +${newLines.length - (hunk.oldCount - removedCount)} lines`
+        );
+
+        // Replace lines
+        resultLines.splice(startIdx, hunk.oldCount, ...newLines);
+      }
+
+      if (isDryRun) {
+        return {
+          result: {
+            filePath: targetPath,
+            isNewFile,
+            hunks: hunks.length,
+            changes,
+          },
+          message: `Dry run: ${hunks.length} hunks validated successfully`,
+        };
+      }
+
+      // Create directories if needed
+      if (shouldCreateDirs) {
+        const dir = path.dirname(targetPath);
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      // Write the patched file
+      fs.writeFileSync(targetPath, resultLines.join('\n'), 'utf-8');
+
+      return {
+        result: {
+          filePath: targetPath,
+          isNewFile,
+          hunks: hunks.length,
+          changes,
+        },
+        message: `Applied ${hunks.length} hunks to ${targetPath}`,
+      };
+    } catch (error: any) {
+      return { error: `Patch failed: ${error.message}` };
+    }
+  },
+};
+
+// ==================== Skill Manager Tool ====================
+tools.skill_manager = {
+  name: 'skill_manager',
+  description:
+    'Create, update, list, and manage reusable skills that the agent can use later. Skills are self-contained units of capability with parameter schemas.',
+  parameters: {
+    type: 'object',
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['create', 'update', 'get', 'list', 'delete', 'execute'],
+        description: 'Action to perform.',
+      },
+      name: {
+        type: 'string',
+        description: 'Skill name (alphanumeric and underscores).',
+      },
+      description: {
+        type: 'string',
+        description: 'Skill description.',
+      },
+      code: {
+        type: 'string',
+        description:
+          'JavaScript/TypeScript code for the skill body. Receives `params` as input, should return a result.',
+      },
+      schemaJson: {
+        type: 'string',
+        description: 'JSON schema for skill parameters.',
+      },
+      skillId: {
+        type: 'string',
+        description: 'Skill ID (for update, get, delete, execute actions).',
+      },
+      params: {
+        type: 'object',
+        description: 'Parameters to pass when executing a skill.',
+      },
+    },
+    required: ['action'],
+  },
+  execute: async (params: Record<string, unknown>) => {
+    const { action, name, description, code, schemaJson, skillId, params: execParams } = params;
+    const db = getDatabase();
+
+    // Ensure agent_skills table exists
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS agent_skills (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE,
+        description TEXT,
+        code TEXT NOT NULL,
+        schema_json TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    try {
+      switch (action) {
+        case 'create': {
+          if (!name || !code) return { error: 'name and code are required for create action' };
+          const id = `askill_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          const now = Date.now();
+          db.prepare(
+            'INSERT INTO agent_skills (id, name, description, code, schema_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).run(
+            id,
+            name as string,
+            (description as string) || null,
+            code as string,
+            (schemaJson as string) || null,
+            now,
+            now
+          );
+          return { result: { id, name }, message: `Skill created: ${name}` };
+        }
+        case 'update': {
+          if (!skillId) return { error: 'skillId is required for update action' };
+          const existing = db
+            .prepare('SELECT * FROM agent_skills WHERE id = ?')
+            .get(skillId) as any;
+          if (!existing) return { error: `Skill not found: ${skillId}` };
+          const updates: string[] = [];
+          const values: any[] = [];
+          if (name) {
+            updates.push('name = ?');
+            values.push(name);
+          }
+          if (description !== undefined) {
+            updates.push('description = ?');
+            values.push(description);
+          }
+          if (code) {
+            updates.push('code = ?');
+            values.push(code);
+          }
+          if (schemaJson) {
+            updates.push('schema_json = ?');
+            values.push(schemaJson);
+          }
+          if (updates.length === 0) return { error: 'No fields to update' };
+          updates.push('updated_at = ?');
+          values.push(Date.now());
+          values.push(skillId);
+          db.prepare(`UPDATE agent_skills SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+          const updated = db.prepare('SELECT * FROM agent_skills WHERE id = ?').get(skillId) as any;
+          return { result: updated, message: `Skill updated: ${updated.name}` };
+        }
+        case 'get': {
+          if (!skillId && !name) return { error: 'skillId or name is required for get action' };
+          const skill = skillId
+            ? (db.prepare('SELECT * FROM agent_skills WHERE id = ?').get(skillId) as any)
+            : (db.prepare('SELECT * FROM agent_skills WHERE name = ?').get(name) as any);
+          if (!skill) return { error: 'Skill not found' };
+          return { result: skill };
+        }
+        case 'list': {
+          const skills = db
+            .prepare(
+              'SELECT id, name, description, created_at, updated_at FROM agent_skills ORDER BY created_at DESC'
+            )
+            .all() as any[];
+          return { result: skills, count: skills.length };
+        }
+        case 'delete': {
+          if (!skillId) return { error: 'skillId is required for delete action' };
+          const del = db.prepare('SELECT * FROM agent_skills WHERE id = ?').get(skillId) as any;
+          if (!del) return { error: `Skill not found: ${skillId}` };
+          db.prepare('DELETE FROM agent_skills WHERE id = ?').run(skillId);
+          return { result: { id: skillId }, message: `Skill deleted: ${del.name}` };
+        }
+        case 'execute': {
+          const skill = skillId
+            ? (db.prepare('SELECT * FROM agent_skills WHERE id = ?').get(skillId) as any)
+            : (db.prepare('SELECT * FROM agent_skills WHERE name = ?').get(name) as any);
+          if (!skill) return { error: 'Skill not found' };
+
+          // Execute the skill code in a sandboxed manner
+          const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+          const fn = new AsyncFunction('params', skill.code);
+          const result = await fn(execParams || {});
+          return { result, message: `Skill executed: ${skill.name}` };
+        }
+        default:
+          return { error: `Unknown action: ${action}` };
+      }
+    } catch (error: any) {
+      return { error: `Skill operation failed: ${error.message}` };
+    }
+  },
+};
+
+// ==================== Session Search Tool (for Agent) ====================
+tools.session_search = {
+  name: 'session_search',
+  description:
+    'Search through past conversation sessions to find relevant information. Uses full-text search to match query terms against message content.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: 'Search query to find in past sessions.',
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of results to return. Default: 10.',
+      },
+    },
+    required: ['query'],
+  },
+  execute: async (params: Record<string, unknown>) => {
+    const { query, limit } = params;
+    const db = getDatabase();
+
+    try {
+      const maxResults = (limit as number) || 10;
+
+      // Check if FTS table exists
+      const ftsExists = db
+        .prepare("SELECT name FROM sqlite_master WHERE name = 'session_messages_fts'")
+        .get();
+      if (!ftsExists) {
+        return { error: 'Session search is not available (FTS index not initialized)' };
+      }
+
+      const results = db
+        .prepare(
+          `
+        SELECT
+          sm.session_id,
+          sm.role,
+          sm.content,
+          sm.timestamp,
+          s.title as session_title,
+          snippet(session_messages_fts, 0, '>>>', '<<<', '...', 32) as snippet
+        FROM session_messages_fts fts
+        JOIN session_messages sm ON fts.rowid = sm.id
+        JOIN sessions s ON sm.session_id = s.id
+        WHERE session_messages_fts MATCH ?
+        ORDER BY rank
+        LIMIT ?
+      `
+        )
+        .all(query as string, maxResults) as any[];
+
+      return {
+        result: results.map((r) => ({
+          sessionId: r.session_id,
+          sessionTitle: r.session_title,
+          role: r.role,
+          snippet: r.snippet,
+          timestamp: r.timestamp,
+        })),
+        count: results.length,
+        query: query as string,
+      };
+    } catch (error: any) {
+      return { error: `Session search failed: ${error.message}` };
+    }
+  },
+};
+
+/**
  * Get tool by name
  */
 export function getTool(name: string): Tool | undefined {

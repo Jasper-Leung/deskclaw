@@ -30,6 +30,8 @@ interface Window {
       append: (id: string, message: any) => Promise<void>;
       update: (id: string, data: any) => Promise<void>;
       delete: (id: string) => Promise<void>;
+      search: (query: string, limit?: number) => Promise<any[]>;
+      searchSuggestions: (prefix: string) => Promise<string[]>;
     };
     workflows: {
       list: () => Promise<any[]>;
@@ -351,6 +353,51 @@ interface Window {
         communityId: string,
         providerProtocol?: string
       ) => Promise<{ success: boolean; apiKey?: string; baseUrl?: string; error?: string }>;
+    };
+    // API Server
+    apiServer: {
+      start: (config?: any) => Promise<any>;
+      stop: () => Promise<any>;
+      status: () => Promise<any>;
+      updateConfig: (config: any) => Promise<any>;
+    };
+    // Smart Routing
+    smartRouting: {
+      getConfig: () => Promise<any>;
+      updateConfig: (updates: any) => Promise<any>;
+      testRoute: (message: string, defaultModelId: string) => Promise<any>;
+    };
+    // Context References
+    contextRefs: {
+      preview: (ref: string) => Promise<any>;
+      expand: (text: string) => Promise<any>;
+      parse: (text: string) => Promise<any[]>;
+    };
+    // Credential Pool
+    credentials: {
+      list: (providerId: string) => Promise<any[]>;
+      add: (data: any) => Promise<any>;
+      remove: (id: string) => Promise<any>;
+      update: (id: string, updates: any) => Promise<any>;
+      status: (providerId: string) => Promise<any>;
+      stats: () => Promise<any>;
+      reset: (id: string) => Promise<any>;
+      test: (id: string) => Promise<any>;
+      getConfig: () => Promise<any>;
+      updateConfig: (config: any) => Promise<any>;
+    };
+    // Sub-Agent Delegation
+    delegation: {
+      status: () => Promise<any>;
+      cancel: () => Promise<any>;
+      history: (limit?: number) => Promise<any[]>;
+      getConfig: () => Promise<any>;
+      updateConfig: (config: any) => Promise<any>;
+    };
+    // Usage Tracking
+    usage: {
+      getStats: (options?: any) => Promise<any>;
+      getSession: (sessionId: string) => Promise<any>;
     };
   };
 }
