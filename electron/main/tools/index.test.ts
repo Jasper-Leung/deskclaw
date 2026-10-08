@@ -88,6 +88,25 @@ vi.mock('../ipc/skills.js', () => ({
   getEnabledSkills: vi.fn(() => []),
 }));
 
+type FetchHandler = (url: string, init?: RequestInit) => Response | Promise<Response>;
+
+// Network tools call public APIs (DuckDuckGo, Yahoo Finance). Stubbing fetch
+// keeps the suite deterministic and stops a slow or unreachable endpoint from
+// stalling the pre-push hook.
+function stubFetch(handler: FetchHandler) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((input: unknown, init?: RequestInit) => handler(String(input), init))
+  );
+}
+
+const jsonResponse = (data: unknown) =>
+  new Response(JSON.stringify(data), {
+    status: 200,
+    statusText: 'OK',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
 describe('Tools System', () => {
   const testDir = path.join(os.tmpdir(), 'deskclaw-test');
 
@@ -104,6 +123,7 @@ describe('Tools System', () => {
       // Ignore cleanup errors
     }
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   describe('getTool', () => {
@@ -311,35 +331,109 @@ describe('Tools System', () => {
   describe('web_search tool', () => {
     it('should search the web', async () => {
       const { executeTool } = await import('./index.js');
-      // Note: This test makes real network calls
-      // In a real test environment, you might want to mock fetch
-      const result = await executeTool('web_search', { query: 'test query' });
-      // The result might be successful or failed depending on network
-      expect(result).toBeDefined();
-    }, 30000);
+      stubFetch((url) => {
+        if (url.includes('api.duckduckgo.com')) {
+          return jsonResponse({
+            Answer: 'Vitest',
+            AbstractText: 'Vitest is a fast unit test framework.',
+            RelatedTopics: [{ Text: 'Related one' }, { Text: 'Related two' }],
+          });
+        }
+        return jsonResponse({});
+      });
+
+      const result = await executeTool('web_search', { query: 'vitest' });
+      expect(result.error).toBeUndefined();
+      const payload = result.result as { query: string; answer: string; source: string };
+      expect(payload.query).toBe('vitest');
+      expect(payload.answer).toContain('Vitest');
+      expect(payload.source).toBe('DuckDuckGo Instant Answer');
+    });
+
+    it('should fall back to Wikipedia when DuckDuckGo returns no matches', async () => {
+      const { executeTool } = await import('./index.js');
+      stubFetch((url) => {
+        if (url.includes('api.duckduckgo.com')) {
+          return jsonResponse({});
+        }
+        // Wikipedia is queried twice: first for the title list, then the extract.
+        if (url.includes('wikipedia.org') && url.includes('prop=extracts')) {
+          return jsonResponse({
+            query: { pages: { 1234: { extract: 'Vitest is a fast unit test framework.' } } },
+          });
+        }
+        if (url.includes('wikipedia.org')) {
+          return jsonResponse({ query: { search: [{ title: 'Vitest' }] } });
+        }
+        return jsonResponse({});
+      });
+
+      const result = await executeTool('web_search', { query: 'vitest' });
+      expect(result.error).toBeUndefined();
+      const payload = result.result as { answer: string; source: string };
+      expect(payload.source).toBe('Wikipedia');
+      expect(payload.answer).toContain('Vitest is a fast unit test framework.');
+    });
+
+    it('should surface an error when every engine fails', async () => {
+      const { executeTool } = await import('./index.js');
+      stubFetch(() => new Response('', { status: 503, statusText: 'Service Unavailable' }));
+
+      const result = await executeTool('web_search', { query: 'vitest' });
+      expect(result.result).toBeNull();
+      expect(result.error).toBeDefined();
+    });
   });
 
   describe('http_request tool', () => {
     it('should make HTTP GET request', async () => {
       const { executeTool } = await import('./index.js');
-      // Test with a reliable endpoint
+      stubFetch((url) => jsonResponse({ url }));
+
       const result = await executeTool('http_request', {
         url: 'https://httpbin.org/get',
         method: 'GET',
       });
-      expect(result).toBeDefined();
-      // The result might be successful or failed depending on network
-    }, 30000);
+      expect(result.error).toBeUndefined();
+      const payload = result.result as {
+        status: number;
+        method: string;
+        body: Record<string, string>;
+      };
+      expect(payload.status).toBe(200);
+      expect(payload.method).toBe('GET');
+      expect(payload.body.url).toBe('https://httpbin.org/get');
+    });
 
     it('should make HTTP POST request', async () => {
       const { executeTool } = await import('./index.js');
+      let sentBody: string | undefined;
+      stubFetch((_url, init) => {
+        sentBody = typeof init?.body === 'string' ? init.body : undefined;
+        return jsonResponse({ ok: true });
+      });
+
       const result = await executeTool('http_request', {
         url: 'https://httpbin.org/post',
         method: 'POST',
         body: { test: 'data' },
       });
-      expect(result).toBeDefined();
-    }, 30000);
+      expect(result.error).toBeUndefined();
+      expect(JSON.parse(sentBody ?? '{}')).toEqual({ test: 'data' });
+    });
+
+    it('should return the error status from the remote endpoint', async () => {
+      const { executeTool } = await import('./index.js');
+      stubFetch(() => new Response('nope', { status: 404, statusText: 'Not Found' }));
+
+      const result = await executeTool('http_request', {
+        url: 'https://httpbin.org/status/404',
+        method: 'GET',
+      });
+      const payload = result.result as { status: number; body: string };
+      expect(payload.status).toBe(404);
+      expect(payload.body).toBe('nope');
+    });
   });
 
   describe('scheduled_* tools', () => {
@@ -409,25 +503,71 @@ describe('Tools System', () => {
   });
 
   describe('stock_quote tool', () => {
+    const symbolFromUrl = (url: string) =>
+      decodeURIComponent(url.split('/chart/')[1].split('?')[0]);
+
+    const yahooResponse = (symbol: string, price: number) =>
+      jsonResponse({
+        chart: {
+          result: [
+            {
+              meta: {
+                shortName: `${symbol} Inc.`,
+                longName: `${symbol} Incorporated`,
+                regularMarketPrice: price,
+                regularMarketChange: 1.5,
+                currency: 'USD',
+                exchangeName: 'NMS',
+              },
+            },
+          ],
+        },
+      });
+
     it('should get stock quote', async () => {
       const { executeTool } = await import('./index.js');
-      const result = await executeTool('stock_quote', {
-        symbols: 'AAPL',
-        fields: 'price',
-      });
-      expect(result).toBeDefined();
-      // Note: This test makes real network calls to Yahoo Finance
-      // In a real test environment, you might want to mock fetch
-    }, 30000);
+      stubFetch((url) => yahooResponse(symbolFromUrl(url), 190.5));
+
+      const result = await executeTool('stock_quote', { symbols: 'AAPL', fields: 'price' });
+      expect(result.error).toBeUndefined();
+      const payload = result.result as {
+        count: number;
+        data: Record<string, { shortName: string; price: { current: number } }>;
+      };
+      expect(payload.count).toBe(1);
+      expect(payload.data.AAPL.price.current).toBe(190.5);
+      expect(payload.data.AAPL.shortName).toBe('AAPL Inc.');
+    });
 
     it('should handle multiple symbols', async () => {
       const { executeTool } = await import('./index.js');
+      stubFetch((url) => yahooResponse(symbolFromUrl(url), 100));
+
       const result = await executeTool('stock_quote', {
         symbols: 'AAPL,GOOGL,MSFT',
         fields: 'price',
       });
-      expect(result).toBeDefined();
-    }, 30000);
+      expect(result.error).toBeUndefined();
+      const payload = result.result as { count: number; data: Record<string, unknown> };
+      expect(payload.count).toBe(3);
+      expect(Object.keys(payload.data)).toEqual(['AAPL', 'GOOGL', 'MSFT']);
+    });
+
+    it('should report an error for a symbol with no data', async () => {
+      const { executeTool } = await import('./index.js');
+      stubFetch(() => jsonResponse({ chart: { result: [] } }));
+
+      const result = await executeTool('stock_quote', { symbols: 'NOPE', fields: 'price' });
+      const payload = result.result as { data: Record<string, { error?: string }> };
+      expect(payload.data.NOPE.error).toBe('No data found for NOPE');
+    });
+
+    it('should reject a call with no symbols', async () => {
+      const { executeTool } = await import('./index.js');
+      const result = await executeTool('stock_quote', { fields: 'price' });
+      expect(result.result).toBeNull();
+      expect(result.error).toContain('Missing required parameter');
+    });
   });
 
   describe('list_skills tool', () => {
